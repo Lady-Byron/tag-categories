@@ -1,58 +1,79 @@
-name: manual-build
+name: manual-pack
+
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.1.0)'
+        required: true
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  pack:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: js
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Show env
+      # 构建放在 js/ 下执行
+      - name: Build frontend
+        working-directory: js
         run: |
-          node -v
-          npm -v
-          pwd
-          ls -la
-
-      - name: Install webpack toolchain
-        run: npm install -D webpack webpack-cli flarum-webpack-config
-
-      - name: Install deps (no lockfile ok)
-        run: |
+          npm install -D webpack webpack-cli flarum-webpack-config
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      - name: Preflight: verify entrypoints
-        run: |
+          echo "=== Preflight: verify entrypoints ==="
           ls -la src || true
           ls -la src/admin || true
           ls -la src/forum || true
-          # 至少需要一个入口（admin 或 forum）
           if ! ls src/admin/index.* 1>/dev/null 2>&1 && ! ls src/forum/index.* 1>/dev/null 2>&1; then
             echo "❌ missing src/{admin,forum}/index.*"; exit 1; fi
 
-      - name: Build
-        run: npm run build
-        env:
-          NODE_ENV: production
-
-      - name: List dist
-        run: |
+          npm run build
           ls -la dist || true
 
-      - name: Upload dist artifact (optional)
+      - name: 'Upload dist artifact (optional)'
+        if: ${{ hashFiles('js/dist/**') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/**
+          path: js/dist/**
           if-no-files-found: ignore
+
+      - name: 'Commit dist and tag'
+        if: ${{ hashFiles('js/dist/**') != '' }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f js/dist/*
+          git commit -m "chore(build): include js/dist for v${{ inputs.version }}" || true
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: 'Create GitHub Release'
+        if: ${{ hashFiles('js/dist/**') != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            js/dist/admin.js
+            js/dist/forum.js
+            js/dist/admin.js.map
+            js/dist/forum.js.map
+
