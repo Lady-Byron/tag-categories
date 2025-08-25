@@ -1,0 +1,60 @@
+name: manual-pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 0.1.0)"
+        required: true
+      prerelease:
+        description: "Mark as prerelease"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        working-directory: js
+        run: |
+          # 安装工具链与依赖（无锁文件也能跑）
+          npm install -D webpack webpack-cli flarum-webpack-config
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build
+          ls -la dist || true
+
+      - name: Commit dist and tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 强制加入 dist（即使被 .gitignore 忽略）
+          git add -f js/dist/*
+          git commit -m "chore(build): include js/dist for v${{ inputs.version }}" || echo "No changes to commit"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ inputs.version }}"
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            js/dist/admin.js
+            js/dist/forum.js
+            js/dist/admin.js.map
+            js/dist/forum.js.map
