@@ -1,136 +1,58 @@
-name: manual-pack
-
+name: manual-build
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version (e.g., 0.1.0)"
-        required: true
-      prerelease:
-        description: "Mark as prerelease"
-        type: boolean
-        default: false
-      include_dist:
-        description: "Include js/dist in the tag (recommended)"
-        type: boolean
-        default: true
-
-permissions:
-  contents: write
+  workflow_dispatch: {}
 
 jobs:
-  pack:
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: js
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 预检入口：避免“找不到 entrypoints -> 没有 dist”
-      - name: Preflight: verify JS entrypoints
+      - name: Show env
         run: |
-          set -e
-          echo "Checking entrypoints under js/src ..."
-          ls -la js/src || true
-          ls -la js/src/admin || true
-          ls -la js/src/forum || true
+          node -v
+          npm -v
+          pwd
+          ls -la
 
-          has_admin=0; has_forum=0
-          ls js/src/admin/index.* >/dev/null 2>&1 && has_admin=1 || true
-          ls js/src/forum/index.* >/dev/null 2>&1 && has_forum=1 || true
+      - name: Install webpack toolchain
+        run: npm install -D webpack webpack-cli flarum-webpack-config
 
-          if [ "${{ inputs.include_dist }}" = "true" ]; then
-            if [ "$has_admin" -eq 0 ] && [ "$has_forum" -eq 0 ]; then
-              echo "❌ No JS entrypoints found: need js/src/admin/index.* or js/src/forum/index.*"
-              exit 1
-            fi
-          else
-            echo "ℹ️ include_dist=false: skipping strict entrypoint check."
-          fi
-
-      # 构建前端（仅在需要包含 dist 时）
-      - name: Build frontend
-        if: ${{ inputs.include_dist }}
-        working-directory: js
+      - name: Install deps (no lockfile ok)
         run: |
-          set -e
-          npm install -D webpack webpack-cli flarum-webpack-config
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
-          # 使用最小化 flarum 配置：自动发现入口并输出到 js/dist
-          node -e "try{require.resolve('flarum-webpack-config')}catch(e){process.exit(1)}"
-          npm run build
-          echo "=== js/dist ==="
+
+      - name: Preflight: verify entrypoints
+        run: |
+          ls -la src || true
+          ls -la src/admin || true
+          ls -la src/forum || true
+          # 至少需要一个入口（admin 或 forum）
+          if ! ls src/admin/index.* 1>/dev/null 2>&1 && ! ls src/forum/index.* 1>/dev/null 2>&1; then
+            echo "❌ missing src/{admin,forum}/index.*"; exit 1; fi
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: List dist
+        run: |
           ls -la dist || true
 
-      # 验证 dist 是否生成（仅当 include_dist=true）
-      - name: Verify dist exists
-        if: ${{ inputs.include_dist }}
-        run: |
-          set -e
-          if [ ! -f js/dist/admin.js ] && [ ! -f js/dist/forum.js ]; then
-            echo "❌ Build succeeded but js/dist/*.js not found."
-            echo "Hints:"
-            echo " - Ensure js/webpack.config.js = require('flarum-webpack-config')();"
-            echo " - Ensure js/src/{admin,forum}/index.(js|ts|tsx) exists."
-            exit 1
-          fi
-
-      - name: Git config
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      # 提交 dist（仅当 include_dist=true）
-      - name: Commit dist to tag
-        if: ${{ inputs.include_dist }}
-        run: |
-          set -e
-          # 强制加入 dist（即使被 .gitignore 忽略）
-          git add -f js/dist/*
-          git commit -m "chore(build): include js/dist for v${{ inputs.version }}" || echo "No changes to commit"
-
-      # 打 tag 并推送（无论是否包含 dist）
-      - name: Tag and push
-        run: |
-          set -e
-          TAG="v${{ inputs.version }}"
-          # 删除同名 tag（若已存在），避免失败
-          git tag -d "$TAG" 2>/dev/null || true
-          git push origin :refs/tags/"$TAG" 2>/dev/null || true
-
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
-      # 创建 Release，并在包含 dist 时上传 JS 产物
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload dist artifact (optional)
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: "v${{ inputs.version }}"
-          prerelease: ${{ inputs.prerelease }}
-          files: |
-            js/dist/admin.js
-            js/dist/forum.js
-            js/dist/admin.js.map
-            js/dist/forum.js.map
-        if: ${{ inputs.include_dist }}
-
-      - name: Create GitHub Release (no dist)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ inputs.version }}"
-          prerelease: ${{ inputs.prerelease }}
-          body: |
-            ⚠️ This release was created **without** committing `js/dist`.
-            If you install via Composer, frontend assets will be missing.
-            Either:
-            - rebuild and publish a release with `include_dist=true`, or
-            - copy built files manually to `vendor/lady-byron/tag-categories/js/dist` on the server (not recommended).
-        if: ${{ !inputs.include_dist }}
-
+          name: dist
+          path: dist/**
+          if-no-files-found: ignore
