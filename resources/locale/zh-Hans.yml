@@ -1,0 +1,15 @@
+lady-byron-tag-categories:
+  admin:
+    settings:
+      title: "标签分类"
+      list_heading: "已有分类"
+      new_category_heading: "创建新分类"
+      name_label: "名称"
+      slug_label: "别名（Slug）"
+      description_label: "描述"
+      sort_order_label: "排序顺序"
+      add_category_button: "添加分类"
+      delete_confirmation: "确定删除该分类？"
+  forum:
+    composer_tag_select:
+      category_heading: "按分类选择标签"
