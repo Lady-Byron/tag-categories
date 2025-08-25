@@ -1,0 +1,27 @@
+{
+  "name": "lady-byron/tag-categories",
+  "description": "Add category groups for flarum/tags.",
+  "type": "flarum-extension",
+  "license": "MIT",
+  "require": {
+    "flarum/core": "^1.8",
+    "flarum/tags": "^1.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "LadyByron\\TagCategories\\": "src/"
+    }
+  },
+  "extra": {
+    "flarum-extension": {
+      "title": "Tag Categories",
+      "icon": {
+        "name": "fas fa-sitemap",
+        "backgroundColor": "#34495e",
+        "color": "#fff"
+      }
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
