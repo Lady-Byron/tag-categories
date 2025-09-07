@@ -1,0 +1,24 @@
+lady-byron-tag-categories:
+  admin:
+    nav:
+      title: Tag Categories
+      description: Group tags into independent categories for better organization.
+    page:
+      heading: Tag Categories
+      create: Create Category
+      edit: Edit Category
+      delete: Delete Category
+      delete_confirm: Are you sure you want to delete this category? The tag assignments will be removed.
+      name: Name
+      slug: Slug
+      description: Description
+      order: Order
+      save: Save
+      assign_tags: Assign Tags
+      reorder_help: Drag to reorder. Smaller numbers appear first.
+  forum:
+    tag_selection:
+      by_category: Choose by Category
+      ungrouped: Ungrouped
+      expand_all: Expand all
+      collapse_all: Collapse all
