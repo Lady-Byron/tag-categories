@@ -1,0 +1,28 @@
+{
+  "name": "lady-byron/tag-categories",
+  "description": "Add independent category groups for flarum/tags to better organize many tags (grouped view in composer, admin management).",
+  "type": "flarum-extension",
+  "license": "MIT",
+  "require": {
+    "flarum/core": "^1.8",
+    "flarum/tags": "^1.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "LadyByron\\TagCategories\\": "src/"
+    }
+  },
+  "extra": {
+    "flarum-extension": {
+      "title": "Tag Categories",
+      "category": "feature",
+      "icon": {
+        "name": "fas fa-layer-group",
+        "backgroundColor": "#5B8C5A",
+        "color": "#ffffff"
+      }
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
