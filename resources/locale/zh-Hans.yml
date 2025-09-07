@@ -1,0 +1,24 @@
+lady-byron-tag-categories:
+  admin:
+    nav:
+      title: 标签分类组
+      description: 将已有标签横向分组，便于组织与选择。
+    page:
+      heading: 标签分类组
+      create: 新建分类
+      edit: 编辑分类
+      delete: 删除分类
+      delete_confirm: 确认删除该分类？与标签的关联将被清除。
+      name: 名称
+      slug: 别名
+      description: 描述
+      order: 排序值
+      save: 保存
+      assign_tags: 分配标签
+      reorder_help: 拖拽以排序，数值越小越靠前。
+  forum:
+    tag_selection:
+      by_category: 按分类选择标签
+      ungrouped: 未分组
+      expand_all: 全部展开
+      collapse_all: 全部折叠
