@@ -4,10 +4,6 @@
   "compilerOptions": {
     "declaration": true,
     "declarationDir": "./dist-typings",
-    "baseUrl": ".",
-    "paths": {
-      "flarum/*": ["../vendor/flarum/core/js/dist-typings/*"],
-      "flarum/tags/*": ["../vendor/flarum/tags/js/dist-typings/*"]
-    }
+    "skipLibCheck": true
   }
 }
