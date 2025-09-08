@@ -25,7 +25,8 @@ class DeleteTagCategoryGroupController extends AbstractDeleteController
             throw new PermissionDeniedException();
         }
 
-        $id = (int) $request->getQueryParams()['id'];
+        $routeParams = $request->getAttribute('routeParameters') ?? [];
+        $id = (int) ($routeParams['id'] ?? 0);
         $group = $this->groups->findOrFail($id);
 
         // 级联删除 pivot
