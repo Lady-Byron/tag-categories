@@ -25,14 +25,18 @@ return [
     (new Extend\Model(Tag::class))
         ->belongsToMany('categoryGroups', TagCategoryGroup::class, 'tag_category_group_tag', 'tag_id', 'group_id'),
 
-    // API 路由（仅管理员可写）
+     // API 路由（注意顺序与 id 约束，避免 shadowing）
     (new Extend\Routes('api'))
-        ->get('/tag-categories', 'lady-byron.tag-categories.index', Api\Controller\ListTagCategoryGroupsController::class)
-        ->post('/tag-categories', 'lady-byron.tag-categories.create', Api\Controller\CreateTagCategoryGroupController::class)
-        ->patch('/tag-categories/{id}', 'lady-byron.tag-categories.update', Api\Controller\UpdateTagCategoryGroupController::class)
-        ->delete('/tag-categories/{id}', 'lady-byron.tag-categories.delete', Api\Controller\DeleteTagCategoryGroupController::class)
-        ->patch('/tag-categories/order', 'lady-byron.tag-categories.order', Api\Controller\OrderTagCategoryGroupsController::class)
-        ->patch('/tag-categories/{id}/tags', 'lady-byron.tag-categories.sync-tags', Api\Controller\SyncGroupTagsController::class),
+        ->get('/tag-categories', 'lady-byron.tag-categories.index', Controller\ListTagCategoryGroupsController::class)
+        ->post('/tag-categories', 'lady-byron.tag-categories.create', Controller\CreateTagCategoryGroupController::class)
+
+        // 静态路由必须放在变量路由之前
+        ->patch('/tag-categories/order', 'lady-byron.tag-categories.order', Controller\OrderTagCategoryGroupsController::class)
+
+        // 变量路由加数值约束，避免把 'order' 误当作 id
+        ->patch('/tag-categories/{id:[0-9]+}', 'lady-byron.tag-categories.update', Controller\UpdateTagCategoryGroupController::class)
+        ->delete('/tag-categories/{id:[0-9]+}', 'lady-byron.tag-categories.delete', Controller\DeleteTagCategoryGroupController::class)
+        ->patch('/tag-categories/{id:[0-9]+}/tags', 'lady-byron.tag-categories.sync-tags', Controller\SyncGroupTagsController::class),
 
     // Forum 载荷：向前台注入只读的分组结构
     (new Extend\ApiSerializer(ForumSerializer::class))
