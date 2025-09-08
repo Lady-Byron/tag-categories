@@ -1,16 +1,21 @@
 'use strict';
 
-/**
- * Flarum Extension Bundler
- * - Uses flarum-webpack-config to set externals, output format, loaders for TS/TSX, etc.
- * - Produces js/dist/{forum,admin}.js
- */
 const flarumWebpack = require('flarum-webpack-config');
+const path = require('path');
 
-module.exports = flarumWebpack({
-  useExtensions: ['flarum/tags'], // 让打包器识别 flarum/tags 的前端模块
+const config = flarumWebpack({
+  // 关键：入口应相对当前文件（位于 js/）
   entries: {
-    forum: './js/src/forum/index.ts',
-    admin: './js/src/admin/index.ts',
+    forum: './src/forum/index.ts',
+    admin: './src/admin/index.ts',
   },
+  // 声明会使用到 flarum/tags 的前端模块（作为外部依赖，不打进包）
+  useExtensions: ['flarum/tags'],
 });
+
+// 显式把输出目录定到 js/dist
+config.output = config.output || {};
+config.output.path = path.resolve(__dirname, 'dist');
+
+module.exports = config;
+
