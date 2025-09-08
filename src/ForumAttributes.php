@@ -7,7 +7,7 @@ use LadyByron\TagCategories\Repository\TagCategoryGroupRepository;
 
 class ForumAttributes
 {
-    public function tagCategories(ForumSerializer $serializer): array
+    public static function tagCategories(ForumSerializer $serializer): array
     {
         // 为简化起见，Forum 端发送完整分组与 tag id 列表；
         // 前端会与 app.store.all('tags') 求交集，确保只显示当前用户可见的标签。
