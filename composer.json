@@ -16,6 +16,7 @@
     "flarum-extension": {
       "title": "Tag Categories",
       "category": "feature",
+      "id": "lady-byron-tag-categories",
       "icon": {
         "name": "fas fa-layer-group",
         "backgroundColor": "#5B8C5A",
