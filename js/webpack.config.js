@@ -1,27 +1,12 @@
 'use strict';
 
-const flarumWebpack = require('flarum-webpack-config');
-const path = require('path');
+// 官方推荐：使用 flarum-webpack-config 让它自动发现入口 forum.js / admin.js
+const config = require('flarum-webpack-config');
 
-const base = flarumWebpack({
-  entries: {
-    forum: './src/forum/index.ts',
-    admin: './src/admin/index.ts',
-  },
+module.exports = config({
+  // 我们需要从 flarum/tags 导入前端模块，声明一下以便作为 externals 处理
+  // NPM 说明文档示例也使用 'flarum/tags' 作为 useExtensions 值
+  // 这样 @flarum/tags 或 flarum/tags/* 的导入会被正确映射到运行时提供的导出
   useExtensions: ['flarum/tags'],
 });
-
-// flarum-webpack-config 在多入口时通常返回数组；这里统一成数组处理
-const configs = Array.isArray(base) ? base : [base];
-
-// 显式把所有配置的输出目录设置为 js/dist
-for (const cfg of configs) {
-  cfg.output = cfg.output || {};
-  cfg.output.path = path.resolve(__dirname, 'dist');
-  // 保守起见也明确文件名
-  cfg.output.filename = '[name].js';
-}
-
-module.exports = configs;
-
 
