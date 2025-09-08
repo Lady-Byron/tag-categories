@@ -3,19 +3,25 @@
 const flarumWebpack = require('flarum-webpack-config');
 const path = require('path');
 
-const config = flarumWebpack({
-  // 关键：入口应相对当前文件（位于 js/）
+const base = flarumWebpack({
   entries: {
     forum: './src/forum/index.ts',
     admin: './src/admin/index.ts',
   },
-  // 声明会使用到 flarum/tags 的前端模块（作为外部依赖，不打进包）
   useExtensions: ['flarum/tags'],
 });
 
-// 显式把输出目录定到 js/dist
-config.output = config.output || {};
-config.output.path = path.resolve(__dirname, 'dist');
+// flarum-webpack-config 在多入口时通常返回数组；这里统一成数组处理
+const configs = Array.isArray(base) ? base : [base];
 
-module.exports = config;
+// 显式把所有配置的输出目录设置为 js/dist
+for (const cfg of configs) {
+  cfg.output = cfg.output || {};
+  cfg.output.path = path.resolve(__dirname, 'dist');
+  // 保守起见也明确文件名
+  cfg.output.filename = '[name].js';
+}
+
+module.exports = configs;
+
 
