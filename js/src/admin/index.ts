@@ -3,7 +3,7 @@ import { Extend } from 'flarum/common/extend';
 import TagCategoriesPage from './components/TagCategoriesPage';
 import TagCategoryGroup from '../common/models/TagCategoryGroup';
 
-export const moduleName = 'lady-byron/tag-categories';
+export const moduleName = 'lady-byron-tag-categories';
 
 app.initializers.add(moduleName, () => {
   // 前端注册模型类型（与后端 serializer type 对齐：'tag-category-groups'）
