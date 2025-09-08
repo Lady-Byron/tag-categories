@@ -11,10 +11,24 @@ interface Attrs extends Mithril.Attributes {
 }
 
 export default class EditGroupModal extends Modal<Attrs> {
-  name = Stream(this.attrs.group?.name() || '');
-  slug = Stream(this.attrs.group?.slug() || '');
-  description = Stream(this.attrs.group?.description() || '');
-  order = Stream<string>(this.attrs.group?.order()?.toString?.() || '');
+  // 先创建空的 Stream，不在这里读取 this.attrs（否则未初始化时报错）
+  name = Stream<string>('');
+  slug = Stream<string>('');
+  description = Stream<string>('');
+  // 用字符串流做双向绑定，保存时再 parseInt
+  order = Stream<string>('');
+
+  oninit(vnode: Mithril.Vnode<Attrs, this>) {
+    super.oninit(vnode);
+
+    const g = this.attrs.group;
+
+    // 有 group（编辑）就用其值，没有（新建）就用默认空值
+    this.name(g?.name?.() ?? '');
+    this.slug(g?.slug?.() ?? '');
+    this.description(g?.description?.() ?? '');
+    this.order(g?.order?.() != null ? String(g.order()!) : '');
+  }
 
   className() {
     return 'EditGroupModal Modal--small';
@@ -34,18 +48,22 @@ export default class EditGroupModal extends Modal<Attrs> {
             <label>{app.translator.trans('lady-byron-tag-categories.admin.page.name')}</label>
             <input class="FormControl" bidi={this.name} />
           </div>
+
           <div class="Form-group">
             <label>{app.translator.trans('lady-byron-tag-categories.admin.page.slug')}</label>
             <input class="FormControl" bidi={this.slug} placeholder="auto-generated if empty" />
           </div>
+
           <div class="Form-group">
             <label>{app.translator.trans('lady-byron-tag-categories.admin.page.description')}</label>
-            <textarea class="FormControl" rows="3" bidi={this.description} />
+            <textarea class="FormControl" rows={3} bidi={this.description} />
           </div>
+
           <div class="Form-group">
             <label>{app.translator.trans('lady-byron-tag-categories.admin.page.order')}</label>
             <input class="FormControl" type="number" bidi={this.order} />
           </div>
+
           <div class="Form-group">
             <Button className="Button Button--primary" onclick={() => this.save()}>
               {app.translator.trans('lady-byron-tag-categories.admin.page.save')}
@@ -83,8 +101,7 @@ export default class EditGroupModal extends Modal<Attrs> {
       }
 
       this.hide();
-
-      if (this.attrs.onsave) this.attrs.onsave();
+      this.attrs.onsave?.();
     } finally {
       this.loading = false;
       m.redraw();
