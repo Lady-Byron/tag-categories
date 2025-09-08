@@ -24,28 +24,25 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Show tool versions
+      - name: Show versions
         working-directory: js
         run: |
           node -v
           npm -v
 
-      - name: Assert entrypoints exist (forum.js/admin.js)
+      - name: Assert Flarum-standard entrypoints exist
         run: |
-          if [ ! -f js/forum.js ] || [ ! -f js/admin.js ]; then
-            echo "::error::Missing js/forum.js or js/admin.js. Per Flarum 1.x docs, these are REQUIRED entrypoints that re-export ./src code."
-            echo "Example:"
-            echo "  // js/forum.js"
-            echo "  export * from './src/forum';"
-            echo "  // js/admin.js"
-            echo "  export * from './src/admin';"
-            exit 1
-          fi
+          # 官方 1.x 要求 js/forum.js & js/admin.js 作为入口代理
+          test -f js/forum.js || { echo "::error::Missing js/forum.js entry. See Flarum frontend docs."; exit 1; }
+          test -f js/admin.js || { echo "::error::Missing js/admin.js entry. See Flarum frontend docs."; exit 1; }
+          # 常见坑：含 JSX 的入口实现必须是 .tsx
+          test -f js/src/forum/index.tsx || { echo "::error::Expected js/src/forum/index.tsx (rename from .ts if it contains JSX)."; exit 1; }
 
       - name: Install deps
         working-directory: js
         run: |
-          npm ci || npm i
+          # 没有 lockfile 就用 npm i；有 lockfile 也能正常工作
+          npm i
 
       - name: Build (flarum-webpack-config)
         working-directory: js
@@ -78,3 +75,4 @@ jobs:
         with:
           name: js-dist
           path: js/dist
+
