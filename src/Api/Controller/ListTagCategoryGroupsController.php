@@ -13,7 +13,7 @@ class ListTagCategoryGroupsController extends AbstractListController
 {
     public $serializer = TagCategoryGroupSerializer::class;
 
-    public $optionalInclude = ['tags'];
+     public $include = ['tags'];
 
     protected $groups;
 
