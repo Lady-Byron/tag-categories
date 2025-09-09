@@ -36,18 +36,11 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
    */
   collapsedGroups!: Set<string>;
 
-  /**
-   * ✅ 新增一个标志位，用于确保默认折叠状态只在第一次渲染时设置
-   */
-  private initialized = false;
-
   oninit(vnode: Vnode) {
     super.oninit(vnode);
 
     // 初始化一个空的 Set 来跟踪折叠状态
     this.collapsedGroups = new Set();
-    // ✅ 每次初始化时重置标志位
-    this.initialized = false;
   }
 
   view(vnode: Vnode) {
@@ -89,23 +82,6 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     const ungrouped = filteredTags.filter((t) => !groupedIdSet.has(Number(t.id())));
 
     const listItems: Mithril.Children[] = [];
-
-    // ✅ 新增逻辑：在第一次渲染时，将所有可折叠分组的名称添加到 collapsedGroups 中
-    if (!this.initialized) {
-      // 从第二个分组开始，都默认折叠
-      grouped.forEach(({ group }, index) => {
-        if (index > 0) {
-          this.collapsedGroups.add(group.name);
-        }
-      });
-
-      // 如果存在未分组的项，也将其默认折叠
-      if (ungrouped.length) {
-        this.collapsedGroups.add('__ungrouped__');
-      }
-
-      this.initialized = true;
-    }
 
     // 定义一个切换分组折叠状态的辅助函数
     const toggleGroup = (groupName: string) => {
