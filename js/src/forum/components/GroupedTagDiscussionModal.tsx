@@ -3,9 +3,12 @@ import Button from 'flarum/common/components/Button';
 import classList from 'flarum/common/utils/classList';
 import highlight from 'flarum/common/helpers/highlight';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
+import extractText from 'flarum/common/utils/extractText';
 
 import TagDiscussionModal, { type TagDiscussionModalAttrs } from 'flarum/tags/forum/components/TagDiscussionModal';
 import tagIcon from 'flarum/tags/common/helpers/tagIcon';
+import tagLabel from 'flarum/tags/common/helpers/tagLabel';
+import ToggleButton from 'flarum/tags/forum/components/ToggleButton';
 import type Tag from 'flarum/tags/common/models/Tag';
 
 type Vnode = Mithril.Vnode<TagDiscussionModalAttrs, GroupedTagDiscussionModal>;
@@ -18,119 +21,112 @@ interface ForumTagCategory {
   tagIds: number[];
 }
 
+/** 与原生一致的宽度计算：CJK 算 2 个字符宽 */
+function lengthWithCJK(text: string) {
+  let len = 0;
+  for (const ch of text || '') {
+    len += /[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]/.test(ch) ? 2 : 1;
+  }
+  return len;
+}
+
 export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDiscussionModalAttrs> {
   view(vnode: Vnode) {
     return super.view(vnode);
   }
 
-  /**
-   * 与原生 TagSelectionModal.content() 完全一致的结构，
-   * 仅把 footer 里的列表映射改成 “分组标题 + 各组标签 + 未分组”。
-   */
   content() {
-    // —— 原生：加载态保持不变 ——
-    // @ts-ignore - inherited
-    if (this.loading || !this.tags) {
-      return <LoadingIndicator />;
-    }
+    // @ts-ignore inherited
+    if (this.loading || !this.tags) return <LoadingIndicator />;
 
-    // —— 原生：顶部表单区域（chips + 搜索 + 提交）保持不变 ——
-    // @ts-ignore - inherited
-    const filterStr: string = this.filter().toLowerCase();
-    // @ts-ignore - inherited
+    // ===== 原生顶部（chips + 输入 + 提交）保留 =====
+    // @ts-ignore inherited
     const primaryCount = this.primaryCount();
-    // @ts-ignore - inherited
+    // @ts-ignore inherited
     const secondaryCount = this.secondaryCount();
-    // @ts-ignore - inherited
-    const tags: Tag[] = this.getFilteredTags();
+    // @ts-ignore inherited
+    const filteredTags: Tag[] = this.getFilteredTags();
 
-    // @ts-ignore - inherited
-    const inputWidth = Math.max(this.lengthWithCJK(extractTextLike(this.getInstruction(primaryCount, secondaryCount))), this.lengthWithCJK(this.filter()));
+    const instruction = extractText(
+      // @ts-ignore inherited
+      this.getInstruction(primaryCount, secondaryCount)
+    );
+    // @ts-ignore inherited
+    const inputWidth = Math.max(lengthWithCJK(instruction), lengthWithCJK(this.filter()));
 
-    // ===== 仅从这里开始“改造列表” =====
+    // ====== 我们的分组逻辑（只替换列表部分）======
     const categories: ForumTagCategory[] = (app.forum.attribute('tagCategories') as ForumTagCategory[]) || [];
-    const id2tag = new Map<number, Tag>(tags.map((t) => [Number(t.id()), t]));
+    const id2tag = new Map<number, Tag>(filteredTags.map((t) => [Number(t.id()), t]));
 
-    // 组装每个分组下的标签（已按原生 sort + 过滤后的集合）
-    const groupedEntries = categories
-      .map((g) => {
-        const list = (g.tagIds || [])
-          .map((id) => id2tag.get(Number(id)))
-          .filter(Boolean) as Tag[];
-        return { group: g, tags: list };
-      })
-      .filter((e) => e.tags.length > 0);
+    const grouped = categories
+      .map((g) => ({
+        group: g,
+        tags: (g.tagIds || []).map((id) => id2tag.get(Number(id))).filter(Boolean) as Tag[],
+      }))
+      .filter((e) => e.tags.length);
 
-    // 统计已分组的 id，用于计算“未分组”
     const groupedIdSet = new Set<number>();
-    groupedEntries.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(Number(t.id()))));
-    const ungrouped = tags.filter((t) => !groupedIdSet.has(Number(t.id())));
+    grouped.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(Number(t.id()))));
+    const ungrouped = filteredTags.filter((t) => !groupedIdSet.has(Number(t.id())));
 
-    // 组装最终要渲染到 <ul> 里的子节点数组
-    let listItems: Mithril.Children[] = [];
-
-    // 如果没有任何有效分组，就回退到原生列表（外观完全一致）
-    if (!groupedEntries.length) {
-      listItems = tags.map((tag) => this.renderTagLi(tag, filterStr));
+    const listItems: Mithril.Children[] = [];
+    // 若没有有效分组，完全回退到原生列表（外观/交互不变）
+    if (!grouped.length) {
+      listItems.push(...filteredTags.map((tag) => this.renderTagLi(tag)));
     } else {
-      // 分组标题行：使用一个极轻量的类名，保持原生 ul/li 结构
-      for (const { group, tags: list } of groupedEntries) {
-        listItems.push(
-          <li className="TagSelectionModal-groupHeader">{group.name}</li>,
-          ...list.map((tag) => this.renderTagLi(tag, filterStr))
-        );
+      for (const { group, tags } of grouped) {
+        listItems.push(<li className="TagSelectionModal-groupHeader">{group.name}</li>);
+        listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
       }
-
       if (ungrouped.length) {
         listItems.push(
           <li className="TagSelectionModal-groupHeader">
             {app.translator.trans('lady-byron-tag-categories.forum.tag_selection.ungrouped')}
-          </li>,
-          ...ungrouped.map((tag) => this.renderTagLi(tag, filterStr))
+          </li>
         );
+        listItems.push(...ungrouped.map((tag) => this.renderTagLi(tag)));
       }
     }
 
-    // —— 原生整体结构（body + footer）保持不变，仅替换 footer 列表内容 ——
+    // ===== 原生的整体骨架（body + footer） =====
     return [
       <div className="Modal-body">
         <div className="TagSelectionModal-form">
           <div className="TagSelectionModal-form-input">
-            {/* 原生 chips + 输入框 */}
             <div
-              className={'TagsInput FormControl ' + (/* @ts-ignore */ this.focused ? 'focus' : '')}
+              // @ts-ignore inherited
+              className={'TagsInput FormControl ' + (this.focused ? 'focus' : '')}
               onclick={() => this.$('.TagsInput input').focus()}
             >
               <span className="TagsInput-selected">
                 {
-                  // @ts-ignore
+                  // @ts-ignore inherited
                   this.selected.map((tag: Tag) => (
                     <span
                       className="TagsInput-tag"
                       onclick={() => {
-                        // @ts-ignore
+                        // @ts-ignore inherited
                         this.removeTag(tag);
-                        // @ts-ignore
+                        // @ts-ignore inherited
                         this.onready();
                       }}
                     >
-                      {tagLabelLike(tag)}
+                      {tagLabel(tag)}
                     </span>
                   ))
                 }
               </span>
               <input
                 className="FormControl"
-                // @ts-ignore
-                placeholder={extractTextLike(this.getInstruction(primaryCount, secondaryCount))}
-                // @ts-ignore
+                placeholder={instruction}
+                // @ts-ignore inherited
                 bidi={this.filter}
                 style={{ width: inputWidth + 'ch' }}
-                // @ts-ignore
+                // @ts-ignore inherited
                 onkeydown={this.navigator.navigate.bind(this.navigator)}
-                // @ts-ignore
+                // @ts-ignore inherited
                 onfocus={() => (this.focused = true)}
-                // @ts-ignore
+                // @ts-ignore inherited
                 onblur={() => (this.focused = false)}
               />
             </div>
@@ -139,7 +135,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
             <Button
               type="submit"
               className="Button Button--primary"
-              // @ts-ignore
+              // @ts-ignore inherited
               disabled={!this.meetsRequirements(primaryCount, secondaryCount)}
               icon="fas fa-check"
             >
@@ -151,15 +147,17 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
 
       <div className="Modal-footer">
         <ul className="TagSelectionModal-list SelectTagList">{listItems}</ul>
+
         {
-          // 保留原生的 “忽略标签选择（bypass）” 开关
-          // @ts-ignore
+          // @ts-ignore inherited
           this.attrs.limits?.allowBypassing && (
             <div className="TagSelectionModal-controls">
-              {/* 这里沿用原生 ToggleButton 的 DOM 结构/类名由原生组件负责；父类里会导入并渲染 */}
-              <button className={classList('Button', { 'Button--toggled': /* @ts-ignore */ this.bypassReqs })} onclick={() => (/* @ts-ignore */ this.bypassReqs = !this.bypassReqs)}>
-                {app.translator.trans('flarum-tags.lib.tag_selection_modal.bypass_requirements')}
-              </button>
+              {
+                // @ts-ignore inherited
+                <ToggleButton className="Button" onclick={() => (this.bypassReqs = !this.bypassReqs)} isToggled={this.bypassReqs}>
+                  {app.translator.trans('flarum-tags.lib.tag_selection_modal.bypass_requirements')}
+                </ToggleButton>
+              }
             </div>
           )
         }
@@ -167,12 +165,14 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     ];
   }
 
-  /** 渲染单个标签项：DOM 与类名完全照搬原生，实现原生外观与交互 */
-  private renderTagLi(tag: Tag, filterStr: string) {
-    // @ts-ignore - inherited
+  /** 单个标签项 —— 完全沿用原生 DOM/类名/交互 */
+  private renderTagLi(tag: Tag) {
+    // @ts-ignore inherited
     const selected = this.selected.includes(tag);
-    // @ts-ignore - inherited
+    // @ts-ignore inherited
     const active = this.indexTag === tag;
+    // @ts-ignore inherited
+    const filterStr: string = this.filter().toLowerCase();
 
     return (
       <li
@@ -185,9 +185,9 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
           active,
         })}
         style={{ color: tag.color() || undefined }}
-        // @ts-ignore
+        // @ts-ignore inherited
         onmouseover={() => (this.indexTag = tag)}
-        // @ts-ignore
+        // @ts-ignore inherited
         onclick={this.toggleTag.bind(this, tag)}
       >
         <i className="SelectTagListItem-icon">
@@ -199,17 +199,4 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
       </li>
     );
   }
-}
-
-/** 下面两个小 helper 只是把原生文件里用到的 extractText、tagLabel 的效果“就地复刻”以避免额外导入 */
-function extractTextLike(v: any): string {
-  if (typeof v === 'string') return v;
-  // flarum 原生 extractText 会从 VDOM 里抽文本，这里保守返回空字符串以保持结构，
-  // 真正的占位文本已经由 flarum/tags 的翻译提供
-  return '';
-}
-function tagLabelLike(tag: Tag) {
-  // 仅用于 chips 内的只读展示，原生 tagLabel 会渲染图标+名称。
-  // 这里直接复用名称即可；若你希望100%一致，可改为从 flarum/tags 导入 tagLabel。
-  return tag.name();
 }
