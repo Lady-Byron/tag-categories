@@ -1,11 +1,14 @@
 import app from 'flarum/forum/app';
+import Button from 'flarum/common/components/Button';
 import classList from 'flarum/common/utils/classList';
 import highlight from 'flarum/common/helpers/highlight';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
+import extractText from 'flarum/common/utils/extractText';
 
 import TagDiscussionModal, { type TagDiscussionModalAttrs } from 'flarum/tags/forum/components/TagDiscussionModal';
 import tagIcon from 'flarum/tags/common/helpers/tagIcon';
-import sortTags from 'flarum/tags/common/utils/sortTags';
+import tagLabel from 'flarum/tags/common/helpers/tagLabel';
+import ToggleButton from 'flarum/tags/forum/components/ToggleButton';
 import type Tag from 'flarum/tags/common/models/Tag';
 
 type Vnode = Mithril.Vnode<TagDiscussionModalAttrs, GroupedTagDiscussionModal>;
@@ -18,7 +21,14 @@ interface ForumTagCategory {
   tagIds: number[];
 }
 
-const toKey = (id: string | number | undefined | null) => String(id ?? '');
+/** 与原生一致的宽度计算：CJK 算 2 个字符宽 */
+function lengthWithCJK(text: string) {
+  let len = 0;
+  for (const ch of text || '') {
+    len += /[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]/.test(ch) ? 2 : 1;
+  }
+  return len;
+}
 
 export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDiscussionModalAttrs> {
   view(vnode: Vnode) {
@@ -26,85 +36,143 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
   }
 
   content() {
-    // 正在加载 tags：沿用父类的 loading 标志
-    // @ts-ignore
-    if (this.loading) return <LoadingIndicator />;
+    // @ts-ignore inherited
+    if (this.loading || !this.tags) return <LoadingIndicator />;
 
-    // 可选标签集合：沿用父类 props/约束
-    // @ts-ignore
-    const base: Tag[] = (this.attrs.selectableTags ? this.attrs.selectableTags() : this.tags) || [];
+    // ===== 原生顶部（chips + 输入 + 提交）保留 =====
+    // @ts-ignore inherited
+    const primaryCount = this.primaryCount();
+    // @ts-ignore inherited
+    const secondaryCount = this.secondaryCount();
+    // @ts-ignore inherited
+    const filteredTags: Tag[] = this.getFilteredTags();
 
-    // @ts-ignore 父类的搜索 Stream
-    const filter: string = this.filter?.() || '';
-    const canSelect = this.attrs.canSelect || (() => true);
+    const instruction = extractText(
+      // @ts-ignore inherited
+      this.getInstruction(primaryCount, secondaryCount)
+    );
+    // @ts-ignore inherited
+    const inputWidth = Math.max(lengthWithCJK(instruction), lengthWithCJK(this.filter()));
 
-    const visible = base.filter((t) => canSelect(t));
-    const filtered = visible.filter((tag) => {
-      if (!filter) return true;
-      const text = `${tag.name()} ${tag.description() || ''}`.toLowerCase();
-      return text.includes(filter.toLowerCase());
-    });
-
-    // —— 分组数据（来自 Forum 载荷）——
+    // ====== 我们的分组逻辑（只替换列表部分）======
     const categories: ForumTagCategory[] = (app.forum.attribute('tagCategories') as ForumTagCategory[]) || [];
-
-    // 关键修正：Map 的 key 统一用 string
-    const id2tag = new Map<string, Tag>(filtered.map((t) => [toKey(t.id()), t]));
+    const id2tag = new Map<number, Tag>(filteredTags.map((t) => [Number(t.id()), t]));
 
     const grouped = categories
-      .map((g) => {
-        const list = (g.tagIds || []).map((id) => id2tag.get(toKey(id))).filter(Boolean) as Tag[];
-        return { group: g, tags: sortTags(list.slice()) };
-      })
-      .filter((entry) => entry.tags.length > 0);
+      .map((g) => ({
+        group: g,
+        tags: (g.tagIds || []).map((id) => id2tag.get(Number(id))).filter(Boolean) as Tag[],
+      }))
+      .filter((e) => e.tags.length);
 
-    // 未分组：从过滤后集合里剔除已分组 ID
-    const groupedIdSet = new Set<string>();
-    grouped.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(toKey(t.id()))));
-    const ungrouped = sortTags(filtered.filter((t) => !groupedIdSet.has(toKey(t.id()))));
+    const groupedIdSet = new Set<number>();
+    grouped.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(Number(t.id()))));
+    const ungrouped = filteredTags.filter((t) => !groupedIdSet.has(Number(t.id())));
 
-    // 如果没有任何分节，回退父类渲染
-    if (!grouped.length && !ungrouped.length) {
-      return super.content();
+    const listItems: Mithril.Children[] = [];
+    // 若没有有效分组，完全回退到原生列表（外观/交互不变）
+    if (!grouped.length) {
+      listItems.push(...filteredTags.map((tag) => this.renderTagLi(tag)));
+    } else {
+      for (const { group, tags } of grouped) {
+        listItems.push(<li className="TagSelectionModal-groupHeader">{group.name}</li>);
+        listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
+      }
+      if (ungrouped.length) {
+        listItems.push(
+          <li className="TagSelectionModal-groupHeader">
+            {app.translator.trans('lady-byron-tag-categories.forum.tag_selection.ungrouped')}
+          </li>
+        );
+        listItems.push(...ungrouped.map((tag) => this.renderTagLi(tag)));
+      }
     }
 
-    // 头部（输入框+提交按钮）直接复用父类的第一段
-    const parentChunks = super.content();
-    const header = Array.isArray(parentChunks) ? parentChunks[0] : parentChunks;
-
-    const renderSection = (title: string, tags: Tag[]) => (
-      <div className="lbtc-GroupSection">
-        <div className="lbtc-GroupSection-title">{title}</div>
-        <ul className="TagSelectionModal-list SelectTagList">
-          {tags.map((tag) => this.renderTagItem(tag, filter))}
-        </ul>
-      </div>
-    );
-
+    // ===== 原生的整体骨架（body + footer） =====
     return [
-      header,
-      <div className="Modal-footer lbtc-GroupedTagSelection">
-        {grouped.map(({ group, tags }) => renderSection(group.name, tags))}
-        {ungrouped.length ? renderSection(app.translator.trans('lady-byron-tag-categories.forum.tag_selection.ungrouped') as unknown as string, ungrouped) : null}
-
-        {this.attrs.limits?.allowBypassing ? (
-          <div className="TagSelectionModal-controls">
-            {/* @ts-ignore 复用父类字段 */}
-            <button className="Button" onclick={() => (this.bypassReqs = !this.bypassReqs)}>
-              {app.translator.trans('flarum-tags.lib.tag_selection_modal.bypass_requirements')}
-            </button>
+      <div className="Modal-body">
+        <div className="TagSelectionModal-form">
+          <div className="TagSelectionModal-form-input">
+            <div
+              // @ts-ignore inherited
+              className={'TagsInput FormControl ' + (this.focused ? 'focus' : '')}
+              onclick={() => this.$('.TagsInput input').focus()}
+            >
+              <span className="TagsInput-selected">
+                {
+                  // @ts-ignore inherited
+                  this.selected.map((tag: Tag) => (
+                    <span
+                      className="TagsInput-tag"
+                      onclick={() => {
+                        // @ts-ignore inherited
+                        this.removeTag(tag);
+                        // @ts-ignore inherited
+                        this.onready();
+                      }}
+                    >
+                      {tagLabel(tag)}
+                    </span>
+                  ))
+                }
+              </span>
+              <input
+                className="FormControl"
+                placeholder={instruction}
+                // @ts-ignore inherited
+                bidi={this.filter}
+                style={{ width: inputWidth + 'ch' }}
+                // @ts-ignore inherited
+                onkeydown={this.navigator.navigate.bind(this.navigator)}
+                // @ts-ignore inherited
+                onfocus={() => (this.focused = true)}
+                // @ts-ignore inherited
+                onblur={() => (this.focused = false)}
+              />
+            </div>
           </div>
-        ) : null}
+          <div className="TagSelectionModal-form-submit App-primaryControl">
+            <Button
+              type="submit"
+              className="Button Button--primary"
+              // @ts-ignore inherited
+              disabled={!this.meetsRequirements(primaryCount, secondaryCount)}
+              icon="fas fa-check"
+            >
+              {app.translator.trans('flarum-tags.lib.tag_selection_modal.submit_button')}
+            </Button>
+          </div>
+        </div>
+      </div>,
+
+      <div className="Modal-footer">
+        <ul className="TagSelectionModal-list SelectTagList">{listItems}</ul>
+
+        {
+          // @ts-ignore inherited
+          this.attrs.limits?.allowBypassing && (
+            <div className="TagSelectionModal-controls">
+              {
+                // @ts-ignore inherited
+                <ToggleButton className="Button" onclick={() => (this.bypassReqs = !this.bypassReqs)} isToggled={this.bypassReqs}>
+                  {app.translator.trans('flarum-tags.lib.tag_selection_modal.bypass_requirements')}
+                </ToggleButton>
+              }
+            </div>
+          )
+        }
       </div>,
     ];
   }
 
-  /** 单项渲染：完全对齐 flarum/tags 的结构和类名 */
-  private renderTagItem(tag: Tag, filter: string) {
-    // @ts-ignore
+  /** 单个标签项 —— 完全沿用原生 DOM/类名/交互 */
+  private renderTagLi(tag: Tag) {
+    // @ts-ignore inherited
+    const selected = this.selected.includes(tag);
+    // @ts-ignore inherited
     const active = this.indexTag === tag;
-    // @ts-ignore
-    const selected = Array.isArray(this.selected) && this.selected.includes(tag);
+    // @ts-ignore inherited
+    const filterStr: string = this.filter().toLowerCase();
 
     return (
       <li
@@ -117,16 +185,20 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
           active,
         })}
         style={{ color: tag.color() || undefined }}
-        onmouseover={() => ((this as any).indexTag = tag)}
-        onclick={() => (this as any).toggleTag(tag)}
+        // @ts-ignore inherited
+        onmouseover={() => (this.indexTag = tag)}
+        // @ts-ignore inherited
+        onclick={this.toggleTag.bind(this, tag)}
       >
         <i className="SelectTagListItem-icon">
           {tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })}
-          <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon"></i>
+          {/* 只在选中时渲染勾号 */}
+          {selected ? <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" /> : null}
         </i>
-        <span className="SelectTagListItem-name">{highlight(tag.name(), filter)}</span>
-        {tag.description() ? <span className="SelectTagListItem-description">{tag.description()}</span> : null}
+        <span className="SelectTagListItem-name">{highlight(tag.name(), filterStr)}</span>
+        {tag.description() ? <span className="SelectTagListItem-description">{tag.description()}</span> : ''}
       </li>
     );
   }
 }
+
