@@ -32,6 +32,7 @@ return [
         ->post('/tag-categories', 'lady-byron.tag-categories.create', ApiController\CreateTagCategoryGroupController::class)
 
         // 静态路由在变量路由之前
+        ->post('/tag-categories/order', 'lady-byron.tag-categories.order.post', ApiController\OrderTagCategoryGroupsController::class)
         ->patch('/tag-categories/order', 'lady-byron.tag-categories.order', ApiController\OrderTagCategoryGroupsController::class)
 
         // 变量路由加数值约束
