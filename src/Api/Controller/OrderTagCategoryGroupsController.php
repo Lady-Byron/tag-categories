@@ -29,7 +29,7 @@ class OrderTagCategoryGroupsController extends AbstractListController
 
     protected function data(Request $request, Document $document)
     {
-        // 只有管理员可操作，抛 403 而非 500
+        // 只有管理员可操作
         RequestUtil::getActor($request)->assertAdmin();
 
         // 1) 解析 ids（兼容多种形状 + 容错）
@@ -44,16 +44,16 @@ class OrderTagCategoryGroupsController extends AbstractListController
             }
         });
 
-        // 3) 统一返回最新顺序的完整列表，并携带 tags 关系
-        //    根据数据库驱动选择一个稳妥的 "NULLS LAST" 表达式
+        // 3) 返回最新顺序的完整列表，并携带 tags 关系
+        //    关键修复：不要在表达式里写表名，避免前缀导致的 "Unknown column"。
         $driver = $this->db->getDriverName();
         $nullsLastExpr = $driver === 'pgsql'
-            ? '(tag_category_groups."order" IS NULL)'
-            : '(tag_category_groups.`order` IS NULL)';
+            ? '("order" IS NULL)'
+            : '(`order` IS NULL)';
 
         return TagCategoryGroup::query()
             ->with('tags')
-            ->orderByRaw($nullsLastExpr)   // NULL 的排在最后
+            ->orderByRaw($nullsLastExpr)   // NULL 的排在最后（0 再到 1）
             ->orderBy('order')
             ->orderBy('id')
             ->get();
@@ -64,7 +64,7 @@ class OrderTagCategoryGroupsController extends AbstractListController
      * - { data: { attributes: { ids: [...] } } }
      * - { data: { ids: [...] } }
      * - { ids: [...] }
-     * - 直接是数组: [...]
+     * - 直接数组: [...]
      */
     private function extractIds(Request $request): array
     {
@@ -99,4 +99,3 @@ class OrderTagCategoryGroupsController extends AbstractListController
         return [];
     }
 }
-
