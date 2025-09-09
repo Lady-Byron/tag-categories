@@ -23,16 +23,17 @@ export default class AssignTagsModal extends Modal<Attrs> {
     return app.translator.trans('lady-byron-tag-categories.admin.page.assign_tags');
   }
 
-  async oninit(vnode: Mithril.Vnode<Attrs, this>) {
+    async oninit(vnode: Mithril.Vnode<Attrs, this>) {
     super.oninit(vnode);
 
-    // 确保 tags 已加载
-    if (!app.store.all('tags').length) {
-      await app.store.find('tags');
-    }
+    // ✅ 显式预加载 parent，保证 isChild() 正常
+    await app.store.find('tags', {
+      include: 'parent',
+      page: { limit: 999 },
+    });
     this.allTags = app.store.all<Tag>('tags');
 
-    // 拉取一次当前组（带 include=tags）确保选中项一致
+    // 拉一次当前组（include=tags），同步已选
     const res = await app.request({
       method: 'GET',
       url: app.forum.attribute('apiUrl') + `/tag-categories?include=tags`,
@@ -41,13 +42,12 @@ export default class AssignTagsModal extends Modal<Attrs> {
 
     const fresh = app.store.getById<TagCategoryGroup>('tag-category-groups', this.attrs.group.id() as number);
     const current = fresh?.tags?.() as Tag[] | undefined;
-    if (current) {
-      current.forEach((t) => this.selectedIds.add(t.id() as number));
-    }
+    if (current) current.forEach((t) => this.selectedIds.add(t.id() as number));
 
     this.ready = true;
     m.redraw();
   }
+
 
   content() {
     if (!this.ready) {
