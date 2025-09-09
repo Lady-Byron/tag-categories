@@ -4,8 +4,8 @@ namespace LadyByron\TagCategories\Api\Controller;
 
 use Flarum\Api\Controller\AbstractListController;
 use Flarum\Http\RequestUtil;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 use LadyByron\TagCategories\Api\Serializer\TagCategoryGroupSerializer;
 use LadyByron\TagCategories\Model\TagCategoryGroup;
 use LadyByron\TagCategories\Repository\TagCategoryGroupRepository;
@@ -18,21 +18,25 @@ class OrderTagCategoryGroupsController extends AbstractListController
 
     protected TagCategoryGroupRepository $groups;
 
-    public function __construct(TagCategoryGroupRepository $groups)
+    /** @var ConnectionInterface */
+    protected $db;
+
+    public function __construct(TagCategoryGroupRepository $groups, ConnectionInterface $db)
     {
         $this->groups = $groups;
+        $this->db = $db;
     }
 
     protected function data(Request $request, Document $document)
     {
-        // 仅管理员可排序（403 而非 500）
+        // 只有管理员可操作，抛 403 而非 500
         RequestUtil::getActor($request)->assertAdmin();
 
-        // 解析请求体中的 ids（尽量兼容）
+        // 1) 解析 ids（兼容多种形状 + 容错）
         $ids = $this->extractIds($request);
 
-        // 事务内批量更新；从 0 开始更直观（如需从 1 开始，改成 $index+1）
-        DB::transaction(function () use ($ids) {
+        // 2) 事务内批量更新顺序（从 0 开始；如需 1 开始可改为 $index+1）
+        $this->db->transaction(function () use ($ids) {
             foreach (array_values($ids) as $index => $id) {
                 TagCategoryGroup::query()
                     ->where('id', $id)
@@ -40,26 +44,23 @@ class OrderTagCategoryGroupsController extends AbstractListController
             }
         });
 
-        // 返回最新顺序的完整列表（尽量带上关系，避免前端再拉）
-        $list = $this->groups->allOrdered();
+        // 3) 统一返回最新顺序的完整列表，并携带 tags 关系
+        //    根据数据库驱动选择一个稳妥的 "NULLS LAST" 表达式
+        $driver = $this->db->getDriverName();
+        $nullsLastExpr = $driver === 'pgsql'
+            ? '(tag_category_groups."order" IS NULL)'
+            : '(tag_category_groups.`order` IS NULL)';
 
-        // 兼容仓库返回类型（Collection 或 Builder）
-        if (method_exists($list, 'load')) {
-            // 如果你的序列化器/控制器需要 include，可在这里预加载关系
-            $list->load('tags');
-            return $list;
-        }
-
-        // 如果是 Builder，就按统一顺序取出
-        return $list
-            ->orderByRaw('CASE WHEN tag_category_groups.order IS NULL THEN 1 ELSE 0 END')
+        return TagCategoryGroup::query()
+            ->with('tags')
+            ->orderByRaw($nullsLastExpr)   // NULL 的排在最后
             ->orderBy('order')
             ->orderBy('id')
             ->get();
     }
 
     /**
-     * 从请求中抽取 ids，兼容多种形状：
+     * 兼容多种请求体形状：
      * - { data: { attributes: { ids: [...] } } }
      * - { data: { ids: [...] } }
      * - { ids: [...] }
@@ -69,7 +70,7 @@ class OrderTagCategoryGroupsController extends AbstractListController
     {
         $body = $request->getParsedBody();
 
-        // 如果中间件没解析（content-type 缺失等），回退解析原始 JSON
+        // 某些环境 content-type/中间件问题：回退原始 JSON
         if (!is_array($body)) {
             $raw = (string) $request->getBody();
             $decoded = json_decode($raw, true);
@@ -86,7 +87,7 @@ class OrderTagCategoryGroupsController extends AbstractListController
         foreach ($candidates as $value) {
             if (is_array($value)) {
                 $ids = array_values(array_unique(array_map('intval', $value)));
-                // 过滤掉非正整数
+                // 仅保留正整数
                 $ids = array_values(array_filter($ids, fn ($v) => $v > 0));
                 if (!empty($ids)) {
                     return $ids;
