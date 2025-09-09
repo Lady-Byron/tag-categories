@@ -15,32 +15,26 @@ interface ForumTagCategory {
   name: string;
   slug: string | null;
   order: number | null;
-  tagIds: number[];
+  tagIds: number[]; // 注意：后端发 number，我们前端要用 Number() 与 Tag.id() 对齐
 }
 
 export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDiscussionModalAttrs> {
   view(vnode: Vnode) {
-    // 保持父类的外层 view（会包含 Modal 的骨架并调用 content()）
     return super.view(vnode);
   }
 
   content() {
-    // 父类在 tags 未就绪时会置 this.loading
-    // @ts-ignore
+    // @ts-ignore (inherited)
     if (this.loading) return <LoadingIndicator />;
 
-    // ========== 1) 取得“可见可选”的标签集合 ==========
-    // 父类在 oninit 里会准备 this.tags（全部可选标签）
-    // 如果经由 TagSelectionModal 场景传递了 selectableTags() 则以那个为准
-    // @ts-ignore
+    // 1) 可选 + 搜索过滤
+    // @ts-ignore (inherited)
     const base: Tag[] = this.attrs.selectableTags ? this.attrs.selectableTags() : (this.tags as Tag[] | undefined) || [];
     const canSelect = this.attrs.canSelect || (() => true);
     const selectable = base.filter((t) => canSelect(t));
 
-    // 搜索关键字（父类维护的 Stream）
-    // @ts-ignore
+    // @ts-ignore (inherited stream)
     const filter: string = (this.filter && this.filter()) || '';
-
     const filtered: Tag[] = !filter
       ? selectable
       : selectable.filter((tag) => {
@@ -48,33 +42,36 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
           return text.includes(filter.toLowerCase());
         });
 
-    // ========== 2) 在“过滤后可见标签”里做分组 ==========
+    // 2) 构建「可见标签」的 id -> tag 映射（关键：统一数值化）
+    const id2tag = new Map<number, Tag>();
+    filtered.forEach((t) => id2tag.set(Number(t.id()), t));
+
+    // 3) 读取分组并在“过滤后可见标签”里分组
     const categories: ForumTagCategory[] = ((app.forum.attribute('tagCategories') as ForumTagCategory[]) || []).slice();
-
-    // 排序：order 越小越靠前，然后按 id 兜底
     categories.sort((a, b) => (a.order ?? 99999) - (b.order ?? 99999) || a.id - b.id);
-
-    const id2tag = new Map<number, Tag>(filtered.map((t) => [t.id() as number, t]));
 
     const grouped = categories
       .map((g) => {
-        const list = (g.tagIds || []).map((id) => id2tag.get(id)).filter(Boolean) as Tag[];
+        const list = (g.tagIds || [])
+          .map((raw) => id2tag.get(Number(raw)))
+          .filter(Boolean) as Tag[];
         return { g, tags: sortTags(list) };
       })
       .filter((e) => e.tags.length > 0);
 
     const groupedIdSet = new Set<number>();
-    grouped.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(t.id() as number)));
+    grouped.forEach((e) => e.tags.forEach((t) => groupedIdSet.add(Number(t.id()))));
 
-    const ungrouped = sortTags(filtered.filter((t) => !groupedIdSet.has(t.id() as number)));
+    const ungrouped = sortTags(filtered.filter((t) => !groupedIdSet.has(Number(t.id()))));
 
-    // 如果没有任何分组且未分组为空，退回父类原始渲染
+    // 如果完全没有内容，回退原生渲染
     if (!grouped.length && !ungrouped.length) {
       return super.content();
     }
 
-    // ========== 3) 渲染（保持与原生 TagSelectionModal 接近的结构/类名） ==========
-    const ph = app.translator.trans('flarum-tags.lib.tag_selection_modal.search_placeholder');
+    // 4) 渲染（尽量贴近原生类名，样式自动继承）
+    const ph =
+      app.translator.trans('flarum-tags.lib.tag_selection_modal.search_placeholder') as unknown as string;
 
     return (
       <div className="TagSelectionModal">
@@ -104,7 +101,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
           </div>
         </div>
 
-        {/* 各分类组 */}
+        {/* 已分组 */}
         {grouped.map(({ g, tags }) => (
           <div className="Form-group lbtc-GroupSection" key={g.id}>
             <div className="lbtc-GroupSection-title">{g.name}</div>
@@ -136,7 +133,6 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     );
   }
 
-  /** 单个标签项（保持原生类名与交互，继承父类的切换/键盘导航逻辑） */
   private renderTagItem(tag: Tag, filter: string) {
     // @ts-ignore
     const active = this.indexTag === tag;
