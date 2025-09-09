@@ -192,7 +192,8 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
       >
         <i className="SelectTagListItem-icon">
           {tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })}
-          <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon"></i>
+          {/* 只在选中时渲染勾号 */}
+          {selected ? <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" /> : null}
         </i>
         <span className="SelectTagListItem-name">{highlight(tag.name(), filterStr)}</span>
         {tag.description() ? <span className="SelectTagListItem-description">{tag.description()}</span> : ''}
