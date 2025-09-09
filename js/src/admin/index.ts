@@ -1,15 +1,15 @@
 import app from 'flarum/admin/app';
-import { Extend } from 'flarum/common/extend';
+// import { Extend } from 'flarum/common/extend'; // 未使用，可删
 import TagCategoriesPage from './components/TagCategoriesPage';
 import TagCategoryGroup from '../common/models/TagCategoryGroup';
 
 export const moduleName = 'lady-byron-tag-categories';
 
 app.initializers.add(moduleName, () => {
-  // 前端注册模型类型（与后端 serializer type 对齐：'tag-category-groups'）
+  // 注册模型
   app.store.models['tag-category-groups'] = TagCategoryGroup;
 
-  // 导航项
+  // 关键：通过 extensionData 注册页面（由 ExtensionPage 承载，才能保留原生开关）
   app.extensionData
     .for(moduleName)
     .registerPage(TagCategoriesPage)
@@ -23,8 +23,8 @@ app.initializers.add(moduleName, () => {
       100
     );
 
-  // 在扩展列表里显示描述（可选）
-  app.extensionData.for(moduleName).registerSetting(function () {
+  // 可选：显示一段说明文字
+  app.extensionData.for(moduleName).registerSetting(() => {
     return m('div', { class: 'helpText' }, app.translator.trans('lady-byron-tag-categories.admin.nav.description'));
   });
 });
