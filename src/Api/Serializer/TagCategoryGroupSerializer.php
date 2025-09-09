@@ -30,10 +30,8 @@ class TagCategoryGroupSerializer extends AbstractSerializer
     /**
      * 显式声明关系映射，支持 include=tags
      */
-    protected function getRelationships($group): array
+    public function tags(TagCategoryGroup $group)
     {
-        return [
-            'tags' => $this->hasMany($group, TagSerializer::class),
-        ];
+        return $this->hasMany($group, TagSerializer::class);
     }
 }
