@@ -191,9 +191,22 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
         onclick={this.toggleTag.bind(this, tag)}
       >
         <i className="SelectTagListItem-icon">
-          {tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })}
-          {/* 只在选中时渲染勾号 */}
-          {selected ? <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" /> : null}
+          {
+            // 检查标签是否有自定义图标
+            tag.icon() ? (
+              // 如果有自定义图标，则无论是否选中，都始终显示该图标
+              tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
+            ) : (
+              // 如果没有自定义图标（是默认标签）
+              selected ? (
+                // 当被选中时，显示我们自定义的、黑色的、唯一的对勾
+                <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" style={{ color: 'black' }} />
+              ) : (
+                // 当未被选中时，显示它默认的图标（通常是一个空的选择框）
+                tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
+              )
+            )
+          }
         </i>
         <span className="SelectTagListItem-name">{highlight(tag.name(), filterStr)}</span>
         {tag.description() ? <span className="SelectTagListItem-description">{tag.description()}</span> : ''}
