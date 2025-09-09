@@ -3,6 +3,7 @@
 namespace LadyByron\TagCategories\Api\Controller;
 
 use Flarum\Api\Controller\AbstractListController;
+use Flarum\User\User;
 use LadyByron\TagCategories\Api\Serializer\TagCategoryGroupSerializer;
 use LadyByron\TagCategories\Repository\TagCategoryGroupRepository;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -10,11 +11,11 @@ use Tobscure\JsonApi\Document;
 
 class ListTagCategoryGroupsController extends AbstractListController
 {
-    /** 序列化器 */
-    public $serializer = TagCategoryGroupSerializer::class;
+    /** 允许 ?include=tags */
+    protected $optionalInclude = ['tags'];
 
-    /** 允许通过 ?include= 声明的关系 */
-    public $optionalInclude = ['tags'];
+    /** 使用的 serializer */
+    public $serializer = TagCategoryGroupSerializer::class;
 
     protected $groups;
 
@@ -25,7 +26,20 @@ class ListTagCategoryGroupsController extends AbstractListController
 
     protected function data(Request $request, Document $document)
     {
-        // 只返回按顺序的分组列表；具体是否包含 tags 由 $optionalInclude 和请求的 ?include=tags 决定
-        return $this->groups->allOrdered();
+        /** @var User $actor */
+        $actor = $request->getAttribute('actor');
+
+        $include = $this->extractInclude($request); // 解析 ?include=
+
+        // 取出分组（按你的仓库方法）
+        $groups = $this->groups->allOrdered(); // 通常返回 Eloquent\Collection
+
+        // 如果请求了 include=tags，则预加载，避免 N+1
+        if (in_array('tags', $include, true)) {
+            // Eloquent\Collection 也有 ->load()
+            $groups->load('tags');
+        }
+
+        return $groups;
     }
 }
