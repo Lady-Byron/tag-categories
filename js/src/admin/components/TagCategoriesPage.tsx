@@ -1,26 +1,25 @@
 import app from 'flarum/admin/app';
+import ExtensionPage from 'flarum/admin/components/ExtensionPage';
 import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import icon from 'flarum/common/helpers/icon';
-import Stream from 'flarum/common/utils/Stream';
-import type Mithril from 'mithril';
 
 import EditGroupModal from './EditGroupModal';
 import AssignTagsModal from './AssignTagsModal';
 import TagCategoryGroup from '../../common/models/TagCategoryGroup';
 
-type Vnode = Mithril.Vnode<Record<string, never>, this>;
-
-export default class TagCategoriesPage {
+export default class TagCategoriesPage extends ExtensionPage {
   private loading = true;
   private groups: TagCategoryGroup[] = [];
   private dirtyOrder = false;
 
-  oninit(vnode: Vnode) {
+  oninit(vnode: any) {
+    super.oninit(vnode); // 必须：保留 ExtensionPage 的初始化逻辑（含开关等）
     this.load();
   }
 
-  view() {
+  // 只渲染内容区；原生开关/标题/描述由 ExtensionPage 提供
+  content() {
     if (this.loading) return <LoadingIndicator />;
 
     return (
@@ -34,8 +33,7 @@ export default class TagCategoriesPage {
           <div class="Form-group">
             <Button className="Button Button--primary" onclick={() => this.openCreate()}>
               {icon('fas fa-plus')} {app.translator.trans('lady-byron-tag-categories.admin.page.create')}
-            </Button>
-            {' '}
+            </Button>{' '}
             <Button disabled={!this.dirtyOrder} className="Button" onclick={() => this.saveOrder()}>
               {icon('fas fa-save')} {app.translator.trans('lady-byron-tag-categories.admin.page.save')}
             </Button>
@@ -86,15 +84,19 @@ export default class TagCategoriesPage {
         method: 'GET',
         url: app.forum.attribute('apiUrl') + '/tag-categories',
       });
-      // 反序列化成 store 模型
-      this.groups = (app.store.pushPayload(res) as any).toArray ? (app.store.pushPayload(res) as any).toArray() : app.store.all<TagCategoryGroup>('tag-category-groups');
-      // 强制按 order 排序（与后端一致）
+
+      // 反序列化成 store 模型并排序
+      this.groups =
+        (app.store.pushPayload(res) as any).toArray?.() ??
+        app.store.all<TagCategoryGroup>('tag-category-groups');
+
       this.groups.sort((a, b) => {
         const ao = a.order() ?? Number.MAX_SAFE_INTEGER;
         const bo = b.order() ?? Number.MAX_SAFE_INTEGER;
         if (ao !== bo) return ao - bo;
         return (a.id() as number) - (b.id() as number);
       });
+
       this.dirtyOrder = false;
     } finally {
       this.loading = false;
@@ -105,9 +107,7 @@ export default class TagCategoriesPage {
   private move(idx: number, delta: number) {
     const ni = idx + delta;
     if (ni < 0 || ni >= this.groups.length) return;
-    const tmp = this.groups[idx];
-    this.groups[idx] = this.groups[ni];
-    this.groups[ni] = tmp;
+    [this.groups[idx], this.groups[ni]] = [this.groups[ni], this.groups[idx]];
     this.dirtyOrder = true;
   }
 
@@ -118,7 +118,7 @@ export default class TagCategoriesPage {
 
     try {
       const res = await app.request({
-        method: 'PATCH',
+        method: 'PATCH', // 你也注册了 POST；保持一致即可
         url: app.forum.attribute('apiUrl') + '/tag-categories/order',
         body: { data: { attributes: { ids } } },
       });
@@ -131,28 +131,19 @@ export default class TagCategoriesPage {
   }
 
   private openCreate() {
-    app.modal.show(EditGroupModal, {
-      onsave: () => this.load(),
-    });
+    app.modal.show(EditGroupModal, { onsave: () => this.load() });
   }
 
   private openEdit(group: TagCategoryGroup) {
-    app.modal.show(EditGroupModal, {
-      group,
-      onsave: () => this.load(),
-    });
+    app.modal.show(EditGroupModal, { group, onsave: () => this.load() });
   }
 
   private openAssign(group: TagCategoryGroup) {
-    app.modal.show(AssignTagsModal, {
-      group,
-      onsave: () => this.load(),
-    });
+    app.modal.show(AssignTagsModal, { group, onsave: () => this.load() });
   }
 
   private async remove(group: TagCategoryGroup) {
     if (!confirm(app.translator.trans('lady-byron-tag-categories.admin.page.delete_confirm'))) return;
-
     this.loading = true;
     m.redraw();
 
