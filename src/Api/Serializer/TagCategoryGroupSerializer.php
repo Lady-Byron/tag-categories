@@ -5,13 +5,10 @@ namespace LadyByron\TagCategories\Api\Serializer;
 use Flarum\Api\Serializer\AbstractSerializer;
 use Flarum\Tags\Api\Serializer\TagSerializer;
 use LadyByron\TagCategories\Model\TagCategoryGroup;
-use Tobscure\JsonApi\Relationship;
 
 class TagCategoryGroupSerializer extends AbstractSerializer
 {
-    /**
-     * JSON:API type（需与前端 app.store.models['tag-category-groups'] 对应）
-     */
+    // 必须与前端 store type 一致
     protected $type = 'tag-category-groups';
 
     /**
@@ -28,10 +25,12 @@ class TagCategoryGroupSerializer extends AbstractSerializer
     }
 
     /**
-     * 关系：支持 ?include=tags
+     * 关系：?include=tags 时生效
+     * 注意：这里不要写返回类型，以避免不同 JSON:API 版本的类型不匹配导致 500。
      */
-    public function tags($group): Relationship
+    public function tags($group)
     {
         return $this->hasMany($group, TagSerializer::class);
     }
 }
+
