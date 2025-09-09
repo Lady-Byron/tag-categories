@@ -31,6 +31,18 @@ function lengthWithCJK(text: string) {
 }
 
 export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDiscussionModalAttrs> {
+  /**
+   * 用于存储已折叠分组的名称或唯一标识符
+   */
+  collapsedGroups!: Set<string>;
+
+  oninit(vnode: Vnode) {
+    super.oninit(vnode);
+
+    // 初始化一个空的 Set 来跟踪折叠状态
+    this.collapsedGroups = new Set();
+  }
+
   view(vnode: Vnode) {
     return super.view(vnode);
   }
@@ -70,21 +82,61 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     const ungrouped = filteredTags.filter((t) => !groupedIdSet.has(Number(t.id())));
 
     const listItems: Mithril.Children[] = [];
+
+    // 定义一个切换分组折叠状态的辅助函数
+    const toggleGroup = (groupName: string) => {
+      if (this.collapsedGroups.has(groupName)) {
+        this.collapsedGroups.delete(groupName);
+      } else {
+        this.collapsedGroups.add(groupName);
+      }
+    };
+
     // 若没有有效分组，完全回退到原生列表（外观/交互不变）
     if (!grouped.length) {
       listItems.push(...filteredTags.map((tag) => this.renderTagLi(tag)));
     } else {
-      for (const { group, tags } of grouped) {
-        listItems.push(<li className="TagSelectionModal-groupHeader">{group.name}</li>);
-        listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
-      }
+      // 渲染分组列表，并区分第一个分组
+      grouped.forEach(({ group, tags }, index) => {
+        // 第一个分组 (index === 0) 不可折叠
+        if (index === 0) {
+          listItems.push(<li className="TagSelectionModal-groupHeader non-collapsible">{group.name}</li>);
+          // 并且总是渲染它的标签
+          listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
+        } else {
+          // 其他分组保持可折叠
+          const isCollapsed = this.collapsedGroups.has(group.name);
+          listItems.push(
+            <li
+              className={classList('TagSelectionModal-groupHeader', { collapsed: isCollapsed })}
+              onclick={() => toggleGroup(group.name)}
+            >
+              <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret"></i>
+              {group.name}
+            </li>
+          );
+          if (!isCollapsed) {
+            listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
+          }
+        }
+      });
+
+      // 渲染未分组列表 (保持可折叠)
       if (ungrouped.length) {
+        const ungroupedKey = '__ungrouped__'; // 给未分组一个唯一的key
+        const isCollapsed = this.collapsedGroups.has(ungroupedKey);
         listItems.push(
-          <li className="TagSelectionModal-groupHeader">
+          <li
+            className={classList('TagSelectionModal-groupHeader', { collapsed: isCollapsed })}
+            onclick={() => toggleGroup(ungroupedKey)}
+          >
+            <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret"></i>
             {app.translator.trans('lady-byron-tag-categories.forum.tag_selection.ungrouped')}
           </li>
         );
-        listItems.push(...ungrouped.map((tag) => this.renderTagLi(tag)));
+        if (!isCollapsed) {
+          listItems.push(...ungrouped.map((tag) => this.renderTagLi(tag)));
+        }
       }
     }
 
@@ -214,4 +266,3 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     );
   }
 }
-
