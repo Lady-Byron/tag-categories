@@ -31,23 +31,30 @@ function lengthWithCJK(text: string) {
 }
 
 export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDiscussionModalAttrs> {
-  /**
-   * 用于存储已折叠分组的名称或唯一标识符
-   */
+  /** 折叠分组集合 */
   collapsedGroups!: Set<string>;
-
-  /**
-   * ✅ 新增一个标志位，用于确保默认折叠状态只在第一次渲染时设置
-   */
+  /** 仅在首次渲染设置默认折叠 */
   private initialized = false;
+
+  // 显式允许三种关闭方式，避免被其它扩展改写默认值后不可关闭
+  static isDismissibleViaEscKey = true;
+  static isDismissibleViaBackdropClick = true;
+  static isDismissibleViaCloseButton = true;
 
   oninit(vnode: Vnode) {
     super.oninit(vnode);
-
-    // 初始化一个空的 Set 来跟踪折叠状态
     this.collapsedGroups = new Set();
-    // ✅ 每次初始化时重置标志位
     this.initialized = false;
+  }
+
+  oncreate(vnode: Mithril.VnodeDOM) {
+    super.oncreate(vnode);
+    // 兜底：确保右上角 X 不触发表单提交，并直连全局关闭通道
+    const closeBtn = this.element?.querySelector<HTMLButtonElement>('.Modal-close');
+    if (closeBtn) {
+      if (!closeBtn.getAttribute('type')) closeBtn.setAttribute('type', 'button');
+      closeBtn.onclick = () => app.modal.close();
+    }
   }
 
   view(vnode: Vnode) {
@@ -73,7 +80,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     // @ts-ignore inherited
     const inputWidth = Math.max(lengthWithCJK(instruction), lengthWithCJK(this.filter()));
 
-    // ====== 我们的分组逻辑（只替换列表部分）======
+    // ====== 分组逻辑（替换列表部分）======
     const categories: ForumTagCategory[] = (app.forum.attribute('tagCategories') as ForumTagCategory[]) || [];
     const id2tag = new Map<number, Tag>(filteredTags.map((t) => [Number(t.id()), t]));
 
@@ -90,81 +97,101 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
 
     const listItems: Mithril.Children[] = [];
 
-    // ✅ 新增逻辑：在第一次渲染时，将所有可折叠分组的名称添加到 collapsedGroups 中
+    // 默认折叠：除第一个分组外的所有分组 + 未分组
     if (!this.initialized) {
-      // 从第二个分组开始，都默认折叠
       grouped.forEach(({ group }, index) => {
-        if (index > 0) {
-          this.collapsedGroups.add(group.name);
-        }
+        if (index > 0) this.collapsedGroups.add(uniqueKeyForGroup(group));
       });
-
-      // 如果存在未分组的项，也将其默认折叠
-      if (ungrouped.length) {
-        this.collapsedGroups.add('__ungrouped__');
-      }
-
+      if (ungrouped.length) this.collapsedGroups.add('__ungrouped__');
       this.initialized = true;
     }
 
-    // 定义一个切换分组折叠状态的辅助函数
     const toggleGroup = (groupName: string) => {
-      if (this.collapsedGroups.has(groupName)) {
-        this.collapsedGroups.delete(groupName);
-      } else {
-        this.collapsedGroups.add(groupName);
-      }
+      if (this.collapsedGroups.has(groupName)) this.collapsedGroups.delete(groupName);
+      else this.collapsedGroups.add(groupName);
     };
 
     // 若没有有效分组，完全回退到原生列表（外观/交互不变）
     if (!grouped.length) {
-      listItems.push(...filteredTags.map((tag) => this.renderTagLi(tag)));
+      listItems.push(
+        ...filteredTags.map((tag) => this.renderTagLi(tag, `li-${tag.id()}`))
+      );
     } else {
       // 渲染分组列表，并区分第一个分组
       grouped.forEach(({ group, tags }, index) => {
-        // 第一个分组 (index === 0) 不可折叠
+        const gKey = uniqueKeyForGroup(group);
+
         if (index === 0) {
-          listItems.push(<li className="TagSelectionModal-groupHeader non-collapsible">{group.name}</li>);
-          // 并且总是渲染它的标签
-          listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
+          // 第一个分组不折叠
+          listItems.push(
+            <li key={`gh-${gKey}`} className="TagSelectionModal-groupHeader non-collapsible">
+              {group.name}
+            </li>
+          );
+          listItems.push(
+            ...tags.map((tag) => this.renderTagLi(tag, `li-${gKey}-${tag.id()}`))
+          );
         } else {
-          // 其他分组保持可折叠
-          const isCollapsed = this.collapsedGroups.has(group.name);
+          const isCollapsed = this.collapsedGroups.has(gKey);
           listItems.push(
             <li
+              key={`gh-${gKey}`}
               className={classList('TagSelectionModal-groupHeader', { collapsed: isCollapsed })}
-              onclick={() => toggleGroup(group.name)}
+              role="button"
+              aria-expanded={!isCollapsed}
+              tabindex="0"
+              onclick={() => toggleGroup(gKey)}
+              onkeydown={(e: KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleGroup(gKey);
+                }
+              }}
             >
-              <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret"></i>
+              <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret" />
               {group.name}
             </li>
           );
           if (!isCollapsed) {
-            listItems.push(...tags.map((tag) => this.renderTagLi(tag)));
+            listItems.push(
+              ...tags.map((tag) => this.renderTagLi(tag, `li-${gKey}-${tag.id()}`))
+            );
           }
         }
       });
 
-      // 渲染未分组列表 (保持可折叠)
+      // 渲染未分组（可折叠）
       if (ungrouped.length) {
-        const ungroupedKey = '__ungrouped__'; // 给未分组一个唯一的key
+        const ungroupedKey = '__ungrouped__';
         const isCollapsed = this.collapsedGroups.has(ungroupedKey);
         listItems.push(
           <li
+            key={`gh-${ungroupedKey}`}
             className={classList('TagSelectionModal-groupHeader', { collapsed: isCollapsed })}
+            role="button"
+            aria-expanded={!isCollapsed}
+            tabindex="0"
             onclick={() => toggleGroup(ungroupedKey)}
+            onkeydown={(e: KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleGroup(ungroupedKey);
+              }
+            }}
           >
-            <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret"></i>
+            <i className="fas fa-chevron-down TagSelectionModal-groupHeader-caret" />
             {app.translator.trans('lady-byron-tag-categories.forum.tag_selection.ungrouped')}
           </li>
         );
         if (!isCollapsed) {
-          listItems.push(...ungrouped.map((tag) => this.renderTagLi(tag)));
+          listItems.push(
+            ...ungrouped.map((tag) => this.renderTagLi(tag, `li-${ungroupedKey}-${tag.id()}`))
+          );
         }
       }
     }
 
-    // ===== 原生的整体骨架（body + footer） =====
+    // ===== 原生骨架（body + footer） =====
     return [
       <div className="Modal-body">
         <div className="TagSelectionModal-form">
@@ -179,6 +206,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
                   // @ts-ignore inherited
                   this.selected.map((tag: Tag) => (
                     <span
+                      key={`sel-${tag.id()}`}
                       className="TagsInput-tag"
                       onclick={() => {
                         // @ts-ignore inherited
@@ -241,8 +269,8 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     ];
   }
 
-  /** 单个标签项 —— 完全沿用原生 DOM/类名/交互 */
-  private renderTagLi(tag: Tag) {
+  /** 单个标签项 —— 完全沿用原生 DOM/类名/交互（补上 key） */
+  private renderTagLi(tag: Tag, vkey?: string) {
     // @ts-ignore inherited
     const selected = this.selected.includes(tag);
     // @ts-ignore inherited
@@ -252,6 +280,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
 
     return (
       <li
+        key={vkey ?? `li-${tag.id()}`}
         data-index={tag.id()}
         className={classList('SelectTagListItem', {
           pinned: tag.position() !== null,
@@ -268,20 +297,12 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
       >
         <i className="SelectTagListItem-icon">
           {
-            // 检查标签是否有自定义图标
-            tag.icon() ? (
-              // 如果有自定义图标，则无论是否选中，都始终显示该图标
-              tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
-            ) : (
-              // 如果没有自定义图标（是默认标签）
-              selected ? (
-                // 当被选中时，显示我们自定义的、黑色的、唯一的对勾
-                <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" style={{ color: 'black' }} />
-              ) : (
-                // 当未被选中时，显示它默认的图标（通常是一个空的选择框）
-                tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
-              )
-            )
+            tag.icon()
+              ? tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
+              : (selected
+                  ? <i className="icon TagIcon fas fa-check SelectTagListItem-checkIcon" style={{ color: 'black' }} />
+                  : tagIcon(tag, { className: 'SelectTagListItem-tagIcon' })
+                )
           }
         </i>
         <span className="SelectTagListItem-name">{highlight(tag.name(), filterStr)}</span>
@@ -289,4 +310,8 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
       </li>
     );
   }
+}
+
+function uniqueKeyForGroup(g: ForumTagCategory) {
+  return String(g.id ?? g.slug ?? g.name);
 }
