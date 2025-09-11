@@ -6,3 +6,124 @@
   font-weight: 600;
   margin-bottom: 6px;
 }
+
+// 只对可折叠的标题应用交互样式
+.TagSelectionModal-groupHeader:not(.non-collapsible) {
+  cursor: pointer; // 鼠标悬停时显示为手形
+  user-select: none; // 防止双击时选中文本
+}
+
+.TagSelectionModal-groupHeader {
+  position: relative; // 保持这个属性给所有标题
+
+  .TagSelectionModal-groupHeader-caret {
+    margin-right: 8px;
+    transition: transform 0.2s ease-in-out; // 添加平滑的旋转动画
+    font-size: 0.9em;
+    color: #666;
+  }
+
+  // 当分组被折叠时
+  &.collapsed {
+    .TagSelectionModal-groupHeader-caret {
+      transform: rotate(-90deg); // 将箭头旋转-90度
+    }
+  }
+}
+
+
+/* 全局（仅本弹窗）统一标题列宽 —— 两处描述对齐的关键 */
+.Modal-content .TagSelectionModal {
+  /* 你可以把 16ch 改成 14ch / 18ch / 240px 等，直到与“上方的描述”完全重合 */
+  --tag-name-col: 16ch;
+}
+
+/* 整行：两列布局 */
+.Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem,
+.Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.2;
+}
+
+/* 图标微距（不影响对齐列） */
+.Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem .TagIcon,
+.Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem .TagIcon {
+  margin-left: 0;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+
+/* 标题列：固定列宽（使用统一变量） */
+.Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-name,
+.Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-name {
+  display: inline;
+  flex: 0 0 var(--tag-name-col);  /* ← 关键：所有列表复用同一列宽 */
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 描述列：紧跟其后、自适应；保持弱化色 */
+.Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-description,
+.Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-description {
+  display: inline-block;
+  flex: 1 1 auto;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted-color) !important;
+}
+
+
+
+/* === Mobile 备用方案：名称一行，描述换到下一行显示（不再把名称挤掉） === */
+@media (max-width: 680px) {
+  .Modal-content .TagSelectionModal {
+    --tag-icon-w: 1.25em;   /* 图标视觉宽度 */
+    --tag-gap: 8px;         /* 图标与名称的间距 */
+  }
+
+  .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem,
+  .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem {
+    display: flex;
+    flex-wrap: wrap;          /* ★ 允许换行 */
+    align-items: baseline;
+    gap: 6px 8px;
+    line-height: 1.25;
+  }
+
+  .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem .TagIcon,
+  .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem .TagIcon {
+    flex: 0 0 auto;
+    margin-left: 0;
+    margin-right: var(--tag-gap);
+  }
+
+  .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-name,
+  .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-name {
+    flex: 1 1 auto;           /* ★ 不再使用固定列宽 */
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-description,
+  .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-description {
+    display: block;           /* ★ 独占一行 */
+    flex: 1 1 100%;
+    /* 关键修正：转义 calc，让 Less 不参与这条表达式的计算 */
+    margin-left: calc(~"var(--tag-icon-w, 1.25em) + var(--tag-gap, 8px)");
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--muted-color) !important;
+  }
+
+  /* 避免桌面端遗留的固定列宽变量干扰移动端布局 */
+  .Modal-content .TagSelectionModal { --tag-name-col: auto; }
+}
