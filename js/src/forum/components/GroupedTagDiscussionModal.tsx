@@ -49,11 +49,10 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
 
   oncreate(vnode: Mithril.VnodeDOM) {
     super.oncreate(vnode);
-    // 兜底：确保右上角 X 不触发表单提交，并直连全局关闭通道
+    // 只把右上角 X 设为非提交按钮，防止 submit；不要自定义 onclick（避免 double-close 污染全局 ModalManager）
     const closeBtn = this.element?.querySelector<HTMLButtonElement>('.Modal-close');
-    if (closeBtn) {
-      if (!closeBtn.getAttribute('type')) closeBtn.setAttribute('type', 'button');
-      closeBtn.onclick = () => app.modal.close();
+    if (closeBtn && !closeBtn.getAttribute('type')) {
+      closeBtn.setAttribute('type', 'button');
     }
   }
 
