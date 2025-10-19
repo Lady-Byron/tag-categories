@@ -78,7 +78,37 @@
   color: var(--muted-color) !important;
 }
 
+/* --- 在你的源 CSS 中 *追加* 以下规则 --- */
 
+/* 1. 修复：为 Duotone 图标创建定位上下文 */
+.TagSelectionModal .SelectTagListItem .fa-duotone {
+  position: relative;
+  display: inline-block;
+  width: 1.1em;
+  line-height: 1; /* 只规范图标 *内部* 行高，不影响外部 */
+  vertical-align: middle; /* 帮助它在外部的 1.2em 行高中更好地对齐 */
+}
+
+/* 2. 修复：强制两个图层堆叠 */
+.TagSelectionModal .SelectTagListItem .fa-duotone::before,
+.TagSelectionModal .SelectTagListItem .fa-duotone::after {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  line-height: 1;
+  text-align: center;
+}
+
+/* 3. 兜底：确保字体家族正确 */
+.TagSelectionModal .SelectTagListItem .fa-duotone,
+.TagSelectionModal .SelectTagListItem .fa-duotone::before,
+.TagSelectionModal .SelectTagListItem .fa-duotone::after {
+  font-family: "Font Awesome 6 Duotone" !important;
+  font-weight: 900;
+}
 
 /* === Mobile 备用方案：名称一行，描述换到下一行显示（不再把名称挤掉） === */
 @media (max-width: 680px) {
