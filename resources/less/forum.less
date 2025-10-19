@@ -80,16 +80,23 @@
 
 /* --- 在你的源 CSS 中 *追加* 以下规则 --- */
 
-/* 1. 修复：为 Duotone 图标创建定位上下文 */
+/*
+ * ==================================================
+ * Flarum 弹窗 Duotone 修复 (v2 - 解决下坠问题)
+ * 请使用这个版本替换你刚才添加的代码
+ * ==================================================
+ */
+
+/* 1. 修复：为 Duotone 图标创建定位上下文
+ * (注意：移除了 display: inline-block 和 vertical-align: middle)
+ */
 .TagSelectionModal .SelectTagListItem .fa-duotone {
   position: relative;
-  display: inline-block;
-  width: 1.1em;
-  line-height: 1; /* 只规范图标 *内部* 行高，不影响外部 */
-  vertical-align: middle; /* 帮助它在外部的 1.2em 行高中更好地对齐 */
+  line-height: 1; /* 规范图标 *内部* 的行高 */
+  width: 1.1em; /* 给予一个标准宽度 */
 }
 
-/* 2. 修复：强制两个图层堆叠 */
+/* 2. 修复：强制两个图层堆叠 (不变) */
 .TagSelectionModal .SelectTagListItem .fa-duotone::before,
 .TagSelectionModal .SelectTagListItem .fa-duotone::after {
   position: absolute !important;
@@ -102,12 +109,29 @@
   text-align: center;
 }
 
-/* 3. 兜底：确保字体家族正确 */
+/* 3. 兜底：确保字体家族正确 (不变) */
 .TagSelectionModal .SelectTagListItem .fa-duotone,
 .TagSelectionModal .SelectTagListItem .fa-duotone::before,
 .TagSelectionModal .SelectTagListItem .fa-duotone::after {
   font-family: "Font Awesome 6 Duotone" !important;
   font-weight: 900;
+}
+
+/* 4. ★ 新增修复：解决垂直下坠问题 ★
+ *
+ * 将图标的直接父容器 (.TagIcon) 变为 flex 容器。
+ * * 工作原理：
+ * 1. .TagIcon 继承了你源 CSS 的 line-height: 1.2，所以它自己的盒子高度是 1.2em。
+ * 2. 它旁边的文字 "博物志" 的盒子高度也是 1.2em。
+ * 3. 外层 Flex (align-items: center) 在对齐这两个等高的盒子，完美！
+ * 4. .TagIcon (作为新的 flex 容器) 使用 align-items: center，
+ * 将 1em 高的 .fa-duotone 图标在它自己的 1.2em 空间内完美地垂直居中。
+ */
+.TagSelectionModal .SelectTagListItem .TagIcon {
+  display: inline-flex;      /* 将其变为行内 flex 容器 */
+  align-items: center;      /* 垂直居中它内部的 .fa-duotone 图标 */
+  justify-content: center;  /* 水平居中（保持图标在中心） */
+  font-style: normal;       /* 继承自 Flarum 默认样式，保持 */
 }
 
 /* === Mobile 备用方案：名称一行，描述换到下一行显示（不再把名称挤掉） === */
