@@ -1,4 +1,5 @@
-import app from 'flarum/forum/app';
+// js/src/forum/components/GroupedTagDiscussionModal.tsx
+import app from 'flarum/forum/app'; 
 import Button from 'flarum/common/components/Button';
 import classList from 'flarum/common/utils/classList';
 import highlight from 'flarum/common/helpers/highlight';
@@ -36,6 +37,9 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
   /** 仅在首次渲染设置默认折叠 */
   private initialized = false;
 
+  /** 方案B：仅首开时允许 onready 聚焦；其后忽略 */
+  private _didInitialReady = false;
+
   // 显式允许三种关闭方式，避免被其它扩展改写默认值后不可关闭
   static isDismissibleViaEscKey = true;
   static isDismissibleViaBackdropClick = true;
@@ -45,6 +49,7 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     super.oninit(vnode);
     this.collapsedGroups = new Set();
     this.initialized = false;
+    this._didInitialReady = false;
   }
 
   oncreate(vnode: Mithril.VnodeDOM) {
@@ -54,6 +59,28 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
     if (closeBtn && !closeBtn.getAttribute('type')) {
       closeBtn.setAttribute('type', 'button');
     }
+  }
+
+  /** 覆写 onready：仅首开时聚焦输入框；其后由 toggle/remove 触发的 onready() 将被忽略 */
+  onready() {
+    if (this._didInitialReady) return;
+    this._didInitialReady = true;
+
+    // 尽量避免首开时拉顶：支持的话使用 preventScroll
+    const input = this.element?.querySelector<HTMLInputElement>('.TagsInput input');
+    if (input && typeof (input as any).focus === 'function') {
+      try {
+        (input as any).focus({ preventScroll: true } as any);
+        return;
+      } catch {
+        input.focus();
+        return;
+      }
+    }
+
+    // 找不到输入框则回退到父类默认行为
+    // @ts-ignore
+    super.onready?.();
   }
 
   view(vnode: Vnode) {
@@ -210,7 +237,8 @@ export default class GroupedTagDiscussionModal extends TagDiscussionModal<TagDis
                       onclick={() => {
                         // @ts-ignore inherited
                         this.removeTag(tag);
-                        // @ts-ignore inherited
+                        // 保持原文件逻辑：依然调用 onready（但因为覆写+已首开，后续不会再聚焦/拉顶）
+                        // @ts-ignore
                         this.onready();
                       }}
                     >
