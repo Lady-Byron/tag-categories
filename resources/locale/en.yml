@@ -16,6 +16,9 @@ lady-byron-tag-categories:
       save: Save
       assign_tags: Assign Tags
       reorder_help: Drag to reorder. Smaller numbers appear first.
+      primary_tags: Primary Tags
+      secondary_tags: Secondary Tags
+      loading: Loading...
   forum:
     tag_selection:
       by_category: Choose by Category

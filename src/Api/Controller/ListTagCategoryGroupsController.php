@@ -3,7 +3,6 @@
 namespace LadyByron\TagCategories\Api\Controller;
 
 use Flarum\Api\Controller\AbstractListController;
-use Flarum\User\User;
 use LadyByron\TagCategories\Api\Serializer\TagCategoryGroupSerializer;
 use LadyByron\TagCategories\Repository\TagCategoryGroupRepository;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -13,7 +12,7 @@ class ListTagCategoryGroupsController extends AbstractListController
 {
     public $serializer = TagCategoryGroupSerializer::class;
 
-     public $include = ['tags'];
+    public $include = ['tags'];
 
     protected $groups;
 
@@ -24,10 +23,6 @@ class ListTagCategoryGroupsController extends AbstractListController
 
     protected function data(Request $request, Document $document)
     {
-        // Forum 端允许只读
-        /** @var User $actor */
-        $actor = $request->getAttribute('actor');
-
         // include=tags 时联表返回
         $include = $this->extractInclude($request);
         $query = $this->groups->allOrdered();

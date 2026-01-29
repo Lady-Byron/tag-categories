@@ -23,44 +23,58 @@ export default class AssignTagsModal extends Modal<Attrs> {
     return app.translator.trans('lady-byron-tag-categories.admin.page.assign_tags');
   }
 
-    async oninit(vnode: Mithril.Vnode<Attrs, this>) {
+  oninit(vnode: Mithril.Vnode<Attrs, this>) {
     super.oninit(vnode);
 
-    // ✅ 显式预加载 parent，保证 isChild() 正常
-    await app.store.find('tags', {
-      include: 'parent',
-      page: { limit: 999 },
-    });
-    this.allTags = app.store.all<Tag>('tags');
-
-    // 拉一次当前组（include=tags），同步已选
-    const res = await app.request({
-      method: 'GET',
-      url: app.forum.attribute('apiUrl') + `/tag-categories?include=tags`,
-    });
-    app.store.pushPayload(res);
-
-    const fresh = app.store.getById<TagCategoryGroup>('tag-category-groups', this.attrs.group.id() as number);
-    const current = fresh?.tags?.() as Tag[] | undefined;
-    if (current) current.forEach((t) => this.selectedIds.add(t.id() as number));
-
-    this.ready = true;
-    m.redraw();
+    // 异步加载数据，避免在 oninit 中直接使用 async
+    this.loadData();
   }
 
+  private async loadData() {
+    try {
+      // 显式预加载 parent，保证 isChild() 正常
+      await app.store.find('tags', {
+        include: 'parent',
+        page: { limit: 999 },
+      });
+      this.allTags = app.store.all<Tag>('tags');
+
+      // 拉一次当前组（include=tags），同步已选
+      const res = await app.request({
+        method: 'GET',
+        url: app.forum.attribute('apiUrl') + `/tag-categories?include=tags`,
+      });
+      app.store.pushPayload(res);
+
+      const fresh = app.store.getById<TagCategoryGroup>('tag-category-groups', this.attrs.group.id() as number);
+      const current = fresh?.tags?.() as Tag[] | undefined;
+      if (current) current.forEach((t) => this.selectedIds.add(t.id() as number));
+
+      this.ready = true;
+    } catch (error) {
+      console.error('Failed to load tags:', error);
+      app.alerts.show({ type: 'error' }, app.translator.trans('core.lib.error.generic_message'));
+    } finally {
+      m.redraw();
+    }
+  }
 
   content() {
     if (!this.ready) {
-      return <div class="Modal-body"><p>Loading...</p></div>;
+      return (
+        <div class="Modal-body">
+          <p>{app.translator.trans('lady-byron-tag-categories.admin.page.loading')}</p>
+        </div>
+      );
     }
 
     // 简单展示：主标签优先、随后次级；按 position 排序
     const primaries = this.allTags.filter((t) => !t.isChild());
     const secondaries = this.allTags.filter((t) => t.isChild());
 
-    const section = (label: string, items: Tag[]) => (
+    const section = (labelKey: string, items: Tag[]) => (
       <div class="Form-group">
-        <h4>{label}</h4>
+        <h4>{app.translator.trans(labelKey)}</h4>
         <div class="CheckboxGrid">
           {items.map((t) => (
             <label class="checkbox">
@@ -79,8 +93,8 @@ export default class AssignTagsModal extends Modal<Attrs> {
     return (
       <div class="Modal-body">
         <div class="Form">
-          {section('Primary Tags', primaries)}
-          {section('Secondary Tags', secondaries)}
+          {section('lady-byron-tag-categories.admin.page.primary_tags', primaries)}
+          {section('lady-byron-tag-categories.admin.page.secondary_tags', secondaries)}
           <div class="Form-group">
             <Button className="Button Button--primary" onclick={() => this.save()}>
               {app.translator.trans('lady-byron-tag-categories.admin.page.save')}
@@ -112,6 +126,9 @@ export default class AssignTagsModal extends Modal<Attrs> {
 
       this.hide();
       if (this.attrs.onsave) this.attrs.onsave();
+    } catch (error) {
+      console.error('Failed to save tags:', error);
+      app.alerts.show({ type: 'error' }, app.translator.trans('core.lib.error.generic_message'));
     } finally {
       this.loading = false;
       m.redraw();

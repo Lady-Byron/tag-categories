@@ -2,15 +2,30 @@
 
 namespace LadyByron\TagCategories\Repository;
 
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Collection;
 use LadyByron\TagCategories\Model\TagCategoryGroup;
 
 class TagCategoryGroupRepository
 {
+    protected ConnectionInterface $db;
+
+    public function __construct(ConnectionInterface $db)
+    {
+        $this->db = $db;
+    }
+
     public function allOrdered(): Collection
     {
+        // 兼容 MySQL 和 PostgreSQL
+        $driver = $this->db->getDriverName();
+        $nullsLastExpr = $driver === 'pgsql'
+            ? '("order" IS NULL)'
+            : '(`order` IS NULL)';
+
         return TagCategoryGroup::query()
-            ->orderByRaw('CASE WHEN `order` IS NULL THEN 1 ELSE 0 END, `order` ASC')
+            ->orderByRaw($nullsLastExpr)
+            ->orderBy('order')
             ->orderBy('id')
             ->get();
     }
