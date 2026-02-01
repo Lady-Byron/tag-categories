@@ -1,6 +1,6 @@
 {
   "name": "lady-byron/tag-categories",
-  "description": "Add independent category groups for flarum/tags to better organize many tags (grouped view in composer, admin management).",
+  "description": "Add independent category groups for flarum/tags to better organize many tags.",
   "type": "flarum-extension",
   "license": "MIT",
   "require": {
@@ -14,16 +14,13 @@
   },
   "extra": {
     "flarum-extension": {
-      "title": "Tag Categories",
+      "title": "Flop Category",
       "category": "feature",
-      "id": "lady-byron-tag-categories",
       "icon": {
         "name": "fas fa-layer-group",
         "backgroundColor": "#5B8C5A",
-        "color": "#ffffff"
+        "color": "#fff"
       }
     }
-  },
-  "minimum-stability": "stable",
-  "prefer-stable": true
+  }
 }
