@@ -16,6 +16,9 @@ lady-byron-tag-categories:
       save: 保存
       assign_tags: 分配标签
       reorder_help: 拖拽以排序，数值越小越靠前。
+      primary_tags: 主标签
+      secondary_tags: 次级标签
+      loading: 加载中...
   forum:
     tag_selection:
       by_category: 按分类选择标签

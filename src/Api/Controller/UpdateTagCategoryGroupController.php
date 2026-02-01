@@ -7,6 +7,7 @@ use Flarum\User\Exception\PermissionDeniedException;
 use Flarum\User\User;
 use Illuminate\Support\Arr;
 use LadyByron\TagCategories\Api\Serializer\TagCategoryGroupSerializer;
+use LadyByron\TagCategories\Model\TagCategoryGroup;
 use LadyByron\TagCategories\Repository\TagCategoryGroupRepository;
 use LadyByron\TagCategories\Validator\TagCategoryGroupValidator;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -32,10 +33,15 @@ class UpdateTagCategoryGroupController extends AbstractShowController
             throw new PermissionDeniedException();
         }
 
-        $id = (int) Arr::get($request->getQueryParams(), 'id');
+        // 修复：使用 routeParameters 获取 ID，与其他控制器保持一致
+        $routeParams = $request->getAttribute('routeParameters') ?? [];
+        $id = (int) ($routeParams['id'] ?? 0);
         $group = $this->groups->findOrFail($id);
 
         $attributes = Arr::get($request->getParsedBody(), 'data.attributes', []);
+
+        // 设置当前分组 ID 用于唯一性验证时排除自身
+        $this->validator->setGroupId($id);
         $this->validator->assertValid($attributes + ['name' => $attributes['name'] ?? $group->name]);
 
         if (array_key_exists('name', $attributes)) {

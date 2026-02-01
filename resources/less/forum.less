@@ -1,4 +1,4 @@
-// Forum grouped tag selection visual helpers; real UI在前端批次提供
+// Forum grouped tag selection visual helpers
 .lbtc-GroupSection {
   margin: 8px 0 16px;
 }
@@ -9,16 +9,16 @@
 
 // 只对可折叠的标题应用交互样式
 .TagSelectionModal-groupHeader:not(.non-collapsible) {
-  cursor: pointer; // 鼠标悬停时显示为手形
-  user-select: none; // 防止双击时选中文本
+  cursor: pointer;
+  user-select: none;
 }
 
 .TagSelectionModal-groupHeader {
-  position: relative; // 保持这个属性给所有标题
+  position: relative;
 
   .TagSelectionModal-groupHeader-caret {
     margin-right: 8px;
-    transition: transform 0.2s ease-in-out; // 添加平滑的旋转动画
+    transition: transform 0.2s ease-in-out;
     font-size: 0.9em;
     color: #666;
   }
@@ -26,15 +26,14 @@
   // 当分组被折叠时
   &.collapsed {
     .TagSelectionModal-groupHeader-caret {
-      transform: rotate(-90deg); // 将箭头旋转-90度
+      transform: rotate(-90deg);
     }
   }
 }
 
 
-/* 全局（仅本弹窗）统一标题列宽 —— 两处描述对齐的关键 */
+/* 全局（仅本弹窗）统一标题列宽 */
 .Modal-content .TagSelectionModal {
-  /* 你可以把 16ch 改成 14ch / 18ch / 240px 等，直到与“上方的描述”完全重合 */
   --tag-name-col: 16ch;
 }
 
@@ -59,7 +58,7 @@
 .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-name,
 .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-name {
   display: inline;
-  flex: 0 0 var(--tag-name-col);  /* ← 关键：所有列表复用同一列宽 */
+  flex: 0 0 var(--tag-name-col);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -80,22 +79,20 @@
 
 /* --- Flarum 标签选择弹窗 Duotone 图标对齐修复 --- */
 
-/* 1. 修正 Duotone 图标分层堆叠问题 */
-
 /* 为 .fa-duotone 自身创建定位上下文，并规范其盒子模型 */
 .TagSelectionModal .SelectTagListItem .fa-duotone {
   position: relative;
-  display: inline-block; /* 确保它表现为一个独立的块级元素，便于定位 */
-  width: 1.25em; /* 给予一个稍宽的容器，以适应某些图标 */
+  display: inline-block;
+  width: 1.25em;
   height: 1em;
   line-height: 1;
-  vertical-align: middle; /* 经典的垂直对齐方式，作为 flex 的优秀备用 */
+  vertical-align: middle;
 }
 
 /* 将两个伪元素（图标的两个图层）绝对定位于容器内 */
 .TagSelectionModal .SelectTagListItem .fa-duotone::before,
 .TagSelectionModal .SelectTagListItem .fa-duotone::after {
-  position: absolute !important; /* 使用 !important 确保覆盖 FontAwesome 的默认样式 */
+  position: absolute !important;
   top: 0;
   left: 0;
   width: 100%;
@@ -114,44 +111,33 @@
 }
 
 
-/* 2. 修正图标整体垂直对齐问题 */
+/* 修正图标整体垂直对齐问题 */
 
-/* 这是关键修复：将图标的直接父容器 (.TagIcon) 变为 flex 容器 */
+/* 将图标的直接父容器 (.TagIcon) 变为 flex 容器，实现精确居中 */
 .TagSelectionModal .SelectTagListItem .TagIcon {
-  display: inline-flex;      /* ★ 将其变为行内 flex 容器 */
-  align-items: center;      /* ★ 让它内部的子项（也就是.fa-duotone）垂直居中 */
-  justify-content: center;  /* 可选：水平居中，让图标在自己的小空间里也居中 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-style: normal;
-  /* 不再需要在这里设置 line-height: 1，因为 align-items 已经解决了对齐问题 */
 }
 
 /* 覆盖原始 CSS 中有问题的 line-height，消除对齐问题的根源 */
 .TagSelectionModal .SelectTagListItem {
-  line-height: normal; /* 废除原有的 line-height: 1.2，让 flexbox 全权负责对齐 */
+  line-height: normal;
 }
 
 
-/* 2. 修正图标整体垂直对齐问题 */
-
-/* 将图标的直接父容器 (.TagIcon) 变为 flex 容器，实现精确居中 */
-.TagSelectionModal .SelectTagListItem .TagIcon {
-  display: inline-flex;      /* ★ 将其变为行内 flex 容器 */
-  align-items: center;      /* ★ 垂直居中它内部的 .fa-duotone 图标 */
-  justify-content: center;  /* ★ 水平居中 */
-  font-style: 1.25;
-}
-
-/* === Mobile 备用方案：名称一行，描述换到下一行显示（不再把名称挤掉） === */
+/* === Mobile 备用方案：名称一行，描述换到下一行显示 === */
 @media (max-width: 680px) {
   .Modal-content .TagSelectionModal {
-    --tag-icon-w: 1.25em;   /* 图标视觉宽度 */
-    --tag-gap: 8px;         /* 图标与名称的间距 */
+    --tag-icon-w: 1.25em;
+    --tag-gap: 8px;
   }
 
   .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem,
   .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem {
     display: flex;
-    flex-wrap: wrap;          /* ★ 允许换行 */
+    flex-wrap: wrap;
     align-items: baseline;
     gap: 6px 8px;
     line-height: normal;
@@ -166,7 +152,7 @@
 
   .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-name,
   .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-name {
-    flex: 1 1 auto;           /* ★ 不再使用固定列宽 */
+    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -175,9 +161,8 @@
 
   .Modal-body  .TagSelectionModal-list.SelectTagList .SelectTagListItem-description,
   .Modal-footer .TagSelectionModal-list.SelectTagList .SelectTagListItem-description {
-    display: block;           /* ★ 独占一行 */
+    display: block;
     flex: 1 1 100%;
-    /* 关键修正：转义 calc，让 Less 不参与这条表达式的计算 */
     margin-left: calc(~"var(--tag-icon-w, 1.25em) + var(--tag-gap, 8px)");
     white-space: nowrap;
     overflow: hidden;

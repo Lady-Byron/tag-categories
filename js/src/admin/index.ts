@@ -1,5 +1,4 @@
 import app from 'flarum/admin/app';
-// import { Extend } from 'flarum/common/extend'; // 未使用，可删
 import TagCategoriesPage from './components/TagCategoriesPage';
 import TagCategoryGroup from '../common/models/TagCategoryGroup';
 

@@ -60,7 +60,7 @@ export default class TagCategoriesPage extends ExtensionPage {
                     <Button className="Button" onclick={() => this.openEdit(g)} icon="fas fa-pen">
                       {app.translator.trans('lady-byron-tag-categories.admin.page.edit')}
                     </Button>
-                    <Button className="Button Button--danger" onclick={() => this.remove(g)} icon="fas fa-trash">
+                    <Button className="Button Button--danger" onclick={() => this.confirmRemove(g)} icon="fas fa-trash">
                       {app.translator.trans('lady-byron-tag-categories.admin.page.delete')}
                     </Button>
                   </div>
@@ -98,6 +98,9 @@ export default class TagCategoriesPage extends ExtensionPage {
       });
 
       this.dirtyOrder = false;
+    } catch (error) {
+      console.error('Failed to load tag categories:', error);
+      app.alerts.show({ type: 'error' }, app.translator.trans('core.lib.error.generic_message'));
     } finally {
       this.loading = false;
       m.redraw();
@@ -118,12 +121,15 @@ export default class TagCategoriesPage extends ExtensionPage {
 
     try {
       const res = await app.request({
-        method: 'PATCH', // 你也注册了 POST；保持一致即可
+        method: 'PATCH',
         url: app.forum.attribute('apiUrl') + '/tag-categories/order',
         body: { data: { attributes: { ids } } },
       });
       app.store.pushPayload(res);
       await this.load();
+    } catch (error) {
+      console.error('Failed to save order:', error);
+      app.alerts.show({ type: 'error' }, app.translator.trans('core.lib.error.generic_message'));
     } finally {
       this.loading = false;
       m.redraw();
@@ -142,8 +148,15 @@ export default class TagCategoriesPage extends ExtensionPage {
     app.modal.show(AssignTagsModal, { group, onsave: () => this.load() });
   }
 
+  private confirmRemove(group: TagCategoryGroup) {
+    // 使用 Flarum 的确认对话框风格
+    if (!window.confirm(String(app.translator.trans('lady-byron-tag-categories.admin.page.delete_confirm')))) {
+      return;
+    }
+    this.remove(group);
+  }
+
   private async remove(group: TagCategoryGroup) {
-    if (!confirm(app.translator.trans('lady-byron-tag-categories.admin.page.delete_confirm'))) return;
     this.loading = true;
     m.redraw();
 
@@ -153,6 +166,9 @@ export default class TagCategoriesPage extends ExtensionPage {
         url: app.forum.attribute('apiUrl') + `/tag-categories/${group.id()}`,
       });
       this.groups = this.groups.filter((g) => g !== group);
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      app.alerts.show({ type: 'error' }, app.translator.trans('core.lib.error.generic_message'));
     } finally {
       this.loading = false;
       m.redraw();
